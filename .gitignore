@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+**/build/
+
+# Local machine config
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets / signing
+*.jks
+*.keystore
+
+# Built artifacts
+*.apk
+*.aab
+
