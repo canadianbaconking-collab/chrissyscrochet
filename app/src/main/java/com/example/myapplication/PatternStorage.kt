@@ -50,11 +50,6 @@ private fun colorToHex(color: Color): String {
     )
 }
 
-private fun hexToColor(hex: String): Color {
-    val cleanHex = hex.removePrefix("#")
-    return Color(android.graphics.Color.parseColor("#$cleanHex"))
-}
-
 fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
     return try {
         val dir = File(context.filesDir, "patterns")
@@ -82,7 +77,7 @@ fun loadPattern(context: Context, filename: String, gridSize: Int): List<Color> 
         val file = File(dir, "$filename.txt")
         if (!file.exists()) return emptyList()
 
-        val colors = file.readText().split(",").map { hexToColor(it) }
+        val colors: List<Color> = file.readText().split(",").map { hexToColor(it) }
         if (colors.size == gridSize * gridSize) colors else emptyList()
     } catch (e: IOException) {
         e.printStackTrace()
@@ -94,11 +89,12 @@ fun getSavedPatterns(context: Context): List<SavedPattern> {
     val dir = File(context.filesDir, "patterns")
     if (!dir.exists()) return emptyList()
 
-    return dir.listFiles()?.filter { it.extension == "txt" }?.map { file ->
+    val files: Array<File> = dir.listFiles() ?: return emptyList()
+    return files.filter { it.extension == "txt" }.map { file: File ->
         val name = file.nameWithoutExtension
         val thumbnailPath = File(dir, "${name}_thumb.png").absolutePath
         SavedPattern(name, thumbnailPath)
-    } ?: emptyList()
+    }
 }
 
 fun exportPatternToImage(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
