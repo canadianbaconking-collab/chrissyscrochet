@@ -5,12 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -86,19 +85,17 @@ fun ColorPalette(
     selectedIndex: Int,
     onColorSelected: (Int) -> Unit
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
+    LazyRow(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         itemsIndexed(colorsHex) { index, colorHex ->
             val color = hexToColor(colorHex)
             Box(
                 modifier = Modifier
-                    .aspectRatio(1f)
+                    .size(72.dp)
                     .background(color)
                     .border(
                         width = if (index == selectedIndex) 4.dp else 2.dp,
