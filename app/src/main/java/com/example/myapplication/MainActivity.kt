@@ -80,9 +80,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import java.io.File
+import kotlin.math.sqrt
 
 enum class SymmetryMode { NONE, VERTICAL, HORIZONTAL, QUADRANT }
 enum class ToolMode { BRUSH, REPLACE }
+data class SizeMismatchState(val raw: RawPattern, val currentSize: Int)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -116,6 +118,7 @@ class MainActivity : ComponentActivity() {
                 var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
+                var pendingMismatch by remember { mutableStateOf<SizeMismatchState?>(null) }
                 var showNewConfirmDialog by remember { mutableStateOf(false) }
                 var toolMode by remember { mutableStateOf(ToolMode.BRUSH) }
                 var replaceSourceColor by remember { mutableStateOf<Color?>(null) }
@@ -133,6 +136,18 @@ class MainActivity : ComponentActivity() {
                 fun selectIndexForPalette(currentHex: String, palette: List<String>): Int {
                     val index = palette.indexOf(currentHex)
                     return if (index >= 0) index else 0
+                }
+
+                fun deriveGridSizeFromPattern(colors: List<Color>): Int {
+                    val count = colors.size
+                    if (count <= 0) return gridSize
+                    val root = sqrt(count.toDouble()).toInt()
+                    return if (root * root == count) root else gridSize
+                }
+
+                fun clearPendingLoadState() {
+                    pendingLoadName = null
+                    pendingMismatch = null
                 }
 
                 fun updatePattern(newPattern: List<Color>, reset: Boolean = false) {
@@ -169,24 +184,29 @@ class MainActivity : ComponentActivity() {
                 }
 
                 fun loadPatternByName(name: String) {
-                    val loadedPattern = loadPattern(context, name, gridSize)
-                    if (loadedPattern.isNotEmpty()) {
-                        if (loadedPattern.size == gridSize * gridSize) {
-                            updatePattern(loadedPattern)
-                            Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "Pattern size mismatch", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        Toast.makeText(context, "Failed to load", Toast.LENGTH_SHORT).show()
+                    pendingMismatch = null
+                    val raw = loadRawPattern(context, name)
+                    if (raw == null) {
+                        Toast.makeText(context, "Failed to load pattern", Toast.LENGTH_SHORT).show()
+                        clearPendingLoadState()
+                        return
                     }
+
+                    if (raw.size == gridSize) {
+                        updatePattern(raw.colors)
+                        Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                        clearPendingLoadState()
+                        return
+                    }
+
+                    pendingMismatch = SizeMismatchState(raw = raw, currentSize = gridSize)
                 }
 
                 if (showLoadConfirmDialog) {
                     AlertDialog(
                         onDismissRequest = {
                             showLoadConfirmDialog = false
-                            pendingLoadName = null
+                            clearPendingLoadState()
                         },
                         title = { Text("Load Pattern?") },
                         text = { Text("Loading will replace the current pattern.") },
@@ -203,8 +223,47 @@ class MainActivity : ComponentActivity() {
                         dismissButton = {
                             Button(onClick = {
                                 showLoadConfirmDialog = false
-                                pendingLoadName = null
+                                clearPendingLoadState()
                             }) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (pendingMismatch != null) {
+                    val mismatch = pendingMismatch!!
+                    AlertDialog(
+                        onDismissRequest = {
+                            clearPendingLoadState()
+                        },
+                        title = { Text("Pattern size mismatch") },
+                        text = {
+                            Text("Loaded ${mismatch.raw.size}x${mismatch.raw.size}, current ${mismatch.currentSize}x${mismatch.currentSize}")
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                val raw = mismatch.raw
+                                gridSize = raw.size
+                                updatePattern(raw.colors)
+                                scale = 1f
+                                offset = Offset.Zero
+                                Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                                clearPendingLoadState()
+                            }) { Text("Switch to ${mismatch.raw.size}x${mismatch.raw.size} and load") }
+                        },
+                        dismissButton = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    val transformed = transformPatternCenter(
+                                        mismatch.raw,
+                                        mismatch.currentSize,
+                                        Color.White
+                                    )
+                                    updatePattern(transformed)
+                                    Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                                    clearPendingLoadState()
+                                }) { Text("Center on ${mismatch.currentSize}x${mismatch.currentSize}") }
+                                TextButton(onClick = { clearPendingLoadState() }) { Text("Cancel") }
+                            }
                         }
                     )
                 }
@@ -427,13 +486,33 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Row {
                                     IconButton(
-                                        onClick = { if (historyIndex > 0) historyIndex-- },
+                                        onClick = {
+                                            if (historyIndex > 0) {
+                                                historyIndex--
+                                                val newSize = deriveGridSizeFromPattern(history[historyIndex])
+                                                if (newSize != gridSize) {
+                                                    gridSize = newSize
+                                                    scale = 1f
+                                                    offset = Offset.Zero
+                                                }
+                                            }
+                                        },
                                         enabled = historyIndex > 0
                                     ) {
                                         Icon(Icons.AutoMirrored.Filled.Undo, "Undo")
                                     }
                                     IconButton(
-                                        onClick = { if (historyIndex < history.lastIndex) historyIndex++ },
+                                        onClick = {
+                                            if (historyIndex < history.lastIndex) {
+                                                historyIndex++
+                                                val newSize = deriveGridSizeFromPattern(history[historyIndex])
+                                                if (newSize != gridSize) {
+                                                    gridSize = newSize
+                                                    scale = 1f
+                                                    offset = Offset.Zero
+                                                }
+                                            }
+                                        },
                                         enabled = historyIndex < history.lastIndex
                                     ) {
                                         Icon(Icons.AutoMirrored.Filled.Redo, "Redo")

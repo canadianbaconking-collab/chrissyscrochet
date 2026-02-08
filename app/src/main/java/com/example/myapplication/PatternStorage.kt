@@ -71,6 +71,95 @@ fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSi
     }
 }
 
+data class RawPattern(val size: Int, val colors: List<Color>)
+
+private fun deriveSquareSizeOrNull(count: Int): Int? {
+    if (count <= 0) return null
+    val root = kotlin.math.sqrt(count.toDouble()).toInt()
+    return if (root * root == count) root else null
+}
+
+/**
+ * Loads the pattern from disk and derives its grid size by sqrt(colorCount).
+ * Returns null if the file is missing/corrupt/non-square.
+ */
+fun loadRawPattern(context: Context, filename: String): RawPattern? {
+    return try {
+        val dir = File(context.filesDir, "patterns")
+        val file = File(dir, "$filename.txt")
+        if (!file.exists()) return null
+
+        val text = file.readText().trim()
+        if (text.isEmpty()) return null
+
+        val colors: List<Color> = text.split(",").map { hexToColor(it) }
+        val size = deriveSquareSizeOrNull(colors.size) ?: return null
+
+        RawPattern(size = size, colors = colors)
+    } catch (e: IOException) {
+        e.printStackTrace()
+        null
+    } catch (e: Exception) {
+        // hex parse or other unexpected issues
+        e.printStackTrace()
+        null
+    }
+}
+
+/**
+ * Deterministic center transform:
+ * - If dstSize > srcSize: center-place src into dst, padColor elsewhere.
+ * - If dstSize < srcSize: crop centered dst window from src.
+ *
+ * Offset rule is FLOOR for odd differences (consistent + deterministic):
+ *   padOffset = (dst - src) / 2
+ *   cropStart = (src - dst) / 2
+ */
+fun transformPatternCenter(
+    raw: RawPattern,
+    dstSize: Int,
+    padColor: Color = Color.White
+): List<Color> {
+    val srcSize = raw.size
+    val src = raw.colors
+
+    if (dstSize <= 0) return emptyList()
+    if (srcSize <= 0) return emptyList()
+    if (src.size != srcSize * srcSize) return emptyList()
+
+    // Identity
+    if (srcSize == dstSize) return src
+
+    // Pad (dst bigger): place src centered into dst
+    if (dstSize > srcSize) {
+        val out = MutableList(dstSize * dstSize) { padColor }
+        val off = (dstSize - srcSize) / 2  // floor
+        for (y in 0 until srcSize) {
+            for (x in 0 until srcSize) {
+                val dstX = x + off
+                val dstY = y + off
+                out[dstY * dstSize + dstX] = src[y * srcSize + x]
+            }
+        }
+        return out
+    }
+
+    // Crop (dst smaller): take centered dst window from src
+    run {
+        val out = MutableList(dstSize * dstSize) { padColor }
+        val start = (srcSize - dstSize) / 2 // floor
+        for (y in 0 until dstSize) {
+            for (x in 0 until dstSize) {
+                val srcX = x + start
+                val srcY = y + start
+                out[y * dstSize + x] = src[srcY * srcSize + srcX]
+            }
+        }
+        return out
+    }
+}
+
+
 fun loadPattern(context: Context, filename: String, gridSize: Int): List<Color> {
     return try {
         val dir = File(context.filesDir, "patterns")
