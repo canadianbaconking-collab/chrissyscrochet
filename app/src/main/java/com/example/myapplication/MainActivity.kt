@@ -116,6 +116,7 @@ class MainActivity : ComponentActivity() {
                 var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
+                var showNewConfirmDialog by remember { mutableStateOf(false) }
                 var toolMode by remember { mutableStateOf(ToolMode.BRUSH) }
                 var replaceSourceColor by remember { mutableStateOf<Color?>(null) }
                 var pickSourceArmed by remember { mutableStateOf(false) }
@@ -161,6 +162,12 @@ class MainActivity : ComponentActivity() {
                     offset = Offset.Zero
                 }
 
+                fun startNewPattern() {
+                    updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
+                    scale = 1f
+                    offset = Offset.Zero
+                }
+
                 fun loadPatternByName(name: String) {
                     val loadedPattern = loadPattern(context, name, gridSize)
                     if (loadedPattern.isNotEmpty()) {
@@ -177,7 +184,10 @@ class MainActivity : ComponentActivity() {
 
                 if (showLoadConfirmDialog) {
                     AlertDialog(
-                        onDismissRequest = { showLoadConfirmDialog = false },
+                        onDismissRequest = {
+                            showLoadConfirmDialog = false
+                            pendingLoadName = null
+                        },
                         title = { Text("Load Pattern?") },
                         text = { Text("Loading will replace the current pattern.") },
                         confirmButton = {
@@ -251,6 +261,23 @@ class MainActivity : ComponentActivity() {
                         },
                         dismissButton = {
                             Button(onClick = { showEditHexDialog = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (showNewConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showNewConfirmDialog = false },
+                        title = { Text("New Pattern?") },
+                        text = { Text("This will clear the current pattern.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                showNewConfirmDialog = false
+                                startNewPattern()
+                            }) { Text("Confirm") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showNewConfirmDialog = false }) { Text("Cancel") }
                         }
                     )
                 }
@@ -392,11 +419,7 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row {
-                                    Button(onClick = {
-                                        updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
-                                        scale = 1f
-                                        offset = Offset.Zero
-                                    }) { Text("New") }
+                                    Button(onClick = { showNewConfirmDialog = true }) { Text("New") }
                                     Spacer(Modifier.width(8.dp))
                                     Button(onClick = { showSaveDialog = true }) { Text("Save") }
                                     Spacer(Modifier.width(8.dp))
