@@ -9,8 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
@@ -30,6 +28,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -37,7 +37,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,8 +45,10 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -126,7 +127,7 @@ class MainActivity : ComponentActivity() {
                 var offset by remember { mutableStateOf(Offset.Zero) }
                 var layoutSize by remember { mutableStateOf(IntSize.Zero) }
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
-                var symmetryOptionsVisible by remember { mutableStateOf(false) }
+                var showGridLines by remember { mutableStateOf(true) }
 
                 fun selectIndexForPalette(currentHex: String, palette: List<String>): Int {
                     val index = palette.indexOf(currentHex)
@@ -571,10 +572,11 @@ class MainActivity : ComponentActivity() {
                                         pattern = pattern,
                                         gridSize = gridSize,
                                         onColorChange = onColorChange,
-                                        selectedColor = selectedColor
+                                        selectedColor = selectedColor,
+                                        showGridLines = showGridLines
                                     )
 
-                                    if (gridSize % 2 == 0) {
+                                    if (showGridLines && gridSize % 2 == 0) {
                                         Canvas(modifier = Modifier.fillMaxSize()) {
                                             val strokeWidth = 2.dp.toPx()
                                             val gridActualSize = size.width.coerceAtMost(size.height)
@@ -627,17 +629,34 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Button(
-                                                onClick = {
-                                                    toolMode = ToolMode.BRUSH
-                                                    pickSourceArmed = false
-                                                },
-                                                modifier = Modifier.weight(1f)
-                                            ) { Text("Brush") }
-                                            Button(
-                                                onClick = { toolMode = ToolMode.REPLACE },
-                                                modifier = Modifier.weight(1f)
-                                            ) { Text("Replace") }
+                                            if (toolMode == ToolMode.BRUSH) {
+                                                Button(
+                                                    onClick = {
+                                                        toolMode = ToolMode.BRUSH
+                                                        pickSourceArmed = false
+                                                    },
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Brush") }
+                                            } else {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        toolMode = ToolMode.BRUSH
+                                                        pickSourceArmed = false
+                                                    },
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Brush") }
+                                            }
+                                            if (toolMode == ToolMode.REPLACE) {
+                                                Button(
+                                                    onClick = { toolMode = ToolMode.REPLACE },
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Replace") }
+                                            } else {
+                                                OutlinedButton(
+                                                    onClick = { toolMode = ToolMode.REPLACE },
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Replace") }
+                                            }
                                         }
                                         Row(
                                             modifier = Modifier
@@ -657,17 +676,66 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.weight(1f)
                                             ) { Text("Apply Replace") }
                                         }
-                                        if (toolMode == ToolMode.REPLACE) {
-                                            val sourceText = if (replaceSourceColor == null) {
-                                                "Source: none"
-                                            } else {
-                                                "Source: selected"
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 8.dp)
+                                        ) {
+                                            Text("Mirror")
+                                            val mirrorEnabled = toolMode == ToolMode.BRUSH
+                                            val mirrorOptions = listOf(
+                                                "Off" to SymmetryMode.NONE,
+                                                "Horizontal" to SymmetryMode.HORIZONTAL,
+                                                "Vertical" to SymmetryMode.VERTICAL,
+                                                "Both" to SymmetryMode.QUADRANT
+                                            )
+                                            LazyRow(
+                                                modifier = Modifier.padding(top = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                items(mirrorOptions) { (label, mode) ->
+                                                    val selected = symmetryMode == mode
+                                                    if (selected) {
+                                                        Button(
+                                                            onClick = { symmetryMode = mode },
+                                                            enabled = mirrorEnabled
+                                                        ) { Text(label) }
+                                                    } else {
+                                                        OutlinedButton(
+                                                            onClick = { symmetryMode = mode },
+                                                            enabled = mirrorEnabled
+                                                        ) { Text(label) }
+                                                    }
+                                                }
                                             }
-                                            Text(
-                                                sourceText,
-                                                modifier = Modifier.padding(top = 8.dp)
+                                        }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Grid lines")
+                                            Spacer(Modifier.width(12.dp))
+                                            Switch(
+                                                checked = showGridLines,
+                                                onCheckedChange = { showGridLines = it }
                                             )
                                         }
+                                        val statusText = if (toolMode == ToolMode.BRUSH) {
+                                            "Brush mode"
+                                        } else {
+                                            when {
+                                                pickSourceArmed -> "Replace: tap a cell to pick source"
+                                                replaceSourceColor == null -> "Replace: pick a source color"
+                                                else -> "Replace: source set, choose target and apply"
+                                            }
+                                        }
+                                        Text(
+                                            statusText,
+                                            modifier = Modifier.padding(top = 8.dp),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
                                     TabRow(
                                         selectedTabIndex = selectedPaletteTab,
@@ -717,38 +785,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
-                            contentAlignment = Alignment.BottomEnd
-                        ) {
-                            Column(horizontalAlignment = Alignment.End) {
-                                AnimatedVisibility(
-                                    visible = symmetryOptionsVisible,
-                                    enter = fadeIn(animationSpec = tween(300)),
-                                    exit = fadeOut(animationSpec = tween(300))
-                                ) {
-                                    Card(modifier = Modifier.padding(bottom = 8.dp)) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            Text("Symmetry", modifier = Modifier.padding(bottom = 4.dp))
-                                            SymmetryMode.values().forEach { mode ->
-                                                Button(
-                                                    onClick = {
-                                                        symmetryMode = mode
-                                                        symmetryOptionsVisible = false
-                                                    },
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    Text(mode.name.lowercase().replaceFirstChar { it.uppercase() })
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                FloatingActionButton(onClick = { symmetryOptionsVisible = !symmetryOptionsVisible }) {
-                                    Icon(Icons.Filled.GridOn, "Symmetry")
-                                }
-                            }
-                        }
+                        
                     }
                 }
             }

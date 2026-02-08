@@ -19,7 +19,8 @@ fun PatternGrid(
     pattern: List<Color>,
     gridSize: Int,
     onColorChange: (Int, Color) -> Unit,
-    selectedColor: Color
+    selectedColor: Color,
+    showGridLines: Boolean
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
@@ -38,9 +39,15 @@ fun PatternGrid(
                 modifier = Modifier
                     .aspectRatio(1f)
                     .background(color)
-                    .border(
-                        width = if (isCenterCell) 1.5.dp else 0.5.dp,
-                        color = if (isCenterCell) Color.Black.copy(alpha = 0.8f) else Color.LightGray
+                    .then(
+                        if (showGridLines) {
+                            Modifier.border(
+                                width = if (isCenterCell) 1.5.dp else 0.5.dp,
+                                color = if (isCenterCell) Color.Black.copy(alpha = 0.8f) else Color.LightGray
+                            )
+                        } else {
+                            Modifier
+                        }
                     )
                     .clickable {
                         // Eyedropper removed, always change color on click
