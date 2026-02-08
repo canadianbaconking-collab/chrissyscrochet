@@ -86,7 +86,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                var selectedColor by remember { mutableStateOf(crochetColors.first()) }
+                var paletteHexColors by remember { mutableStateOf(crochetColorHexes) }
+                var selectedColorIndex by remember { mutableIntStateOf(0) }
+                val selectedColor = hexToColor(paletteHexColors[selectedColorIndex])
                 var gridSize by remember { mutableIntStateOf(36) }
 
                 var history by remember { mutableStateOf(listOf(List(gridSize * gridSize) { Color.White })) }
@@ -96,6 +98,8 @@ class MainActivity : ComponentActivity() {
                 var paletteVisible by remember { mutableStateOf(false) }
                 var showSaveDialog by remember { mutableStateOf(false) }
                 var showLoadDialog by remember { mutableStateOf(false) }
+                var showEditHexDialog by remember { mutableStateOf(false) }
+                var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
                 var filename by remember { mutableStateOf("") }
@@ -163,6 +167,49 @@ class MainActivity : ComponentActivity() {
                                 showLoadConfirmDialog = false
                                 pendingLoadName = null
                             }) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (showEditHexDialog) {
+                    val normalizedHex = normalizeHexInput(hexInput)
+                    val isValid = normalizedHex != null
+                    AlertDialog(
+                        onDismissRequest = { showEditHexDialog = false },
+                        title = { Text("Edit Hex") },
+                        text = {
+                            Column {
+                                TextField(
+                                    value = hexInput,
+                                    onValueChange = { hexInput = it },
+                                    label = { Text("Hex Color") },
+                                    singleLine = true
+                                )
+                                if (!isValid) {
+                                    Text(
+                                        "Enter a valid hex color.",
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val newHex = normalizedHex
+                                    if (newHex != null) {
+                                        val updated = paletteHexColors.toMutableList()
+                                        updated[selectedColorIndex] = newHex
+                                        paletteHexColors = updated
+                                        showEditHexDialog = false
+                                    }
+                                },
+                                enabled = isValid
+                            ) { Text("Confirm") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showEditHexDialog = false }) { Text("Cancel") }
                         }
                     )
                 }
@@ -496,13 +543,29 @@ class MainActivity : ComponentActivity() {
                             exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300))
                         ) {
                             Surface(modifier = Modifier.fillMaxHeight(0.5f), shadowElevation = 8.dp) {
-                                ColorPalette(
-                                    onColorSelected = {
-                                        selectedColor = it
-                                        paletteVisible = false
-                                    },
-                                    selectedColor = selectedColor
-                                )
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Palette", style = MaterialTheme.typography.titleMedium)
+                                        Button(onClick = {
+                                            hexInput = paletteHexColors[selectedColorIndex]
+                                            showEditHexDialog = true
+                                        }) { Text("Edit Hex") }
+                                    }
+                                    ColorPalette(
+                                        colorsHex = paletteHexColors,
+                                        selectedIndex = selectedColorIndex,
+                                        onColorSelected = { index ->
+                                            selectedColorIndex = index
+                                            paletteVisible = false
+                                        }
+                                    )
+                                }
                             }
                         }
 
