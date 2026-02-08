@@ -81,6 +81,7 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 import java.io.File
 
 enum class SymmetryMode { NONE, VERTICAL, HORIZONTAL, QUADRANT }
+enum class ToolMode { BRUSH, REPLACE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,6 +115,10 @@ class MainActivity : ComponentActivity() {
                 var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
+                var toolMode by remember { mutableStateOf(ToolMode.BRUSH) }
+                var replaceSourceColor by remember { mutableStateOf<Color?>(null) }
+                var pickSourceArmed by remember { mutableStateOf(false) }
+                var showReplaceConfirmDialog by remember { mutableStateOf(false) }
                 var filename by remember { mutableStateOf("") }
                 val context = LocalContext.current
 
@@ -141,6 +146,11 @@ class MainActivity : ComponentActivity() {
                     
                     history = newHistory
                     historyIndex = newHistory.lastIndex
+                }
+
+                fun applyReplace(source: Color, target: Color) {
+                    val updated = pattern.map { if (it == source) target else it }
+                    updatePattern(updated)
                 }
                 
                 fun changeGridSize(newSize: Int) {
@@ -280,6 +290,26 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (showReplaceConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showReplaceConfirmDialog = false },
+                        title = { Text("Apply Replace?") },
+                        text = { Text("Replace all matching colors in the pattern?") },
+                        confirmButton = {
+                            Button(onClick = {
+                                val source = replaceSourceColor
+                                showReplaceConfirmDialog = false
+                                if (source != null) {
+                                    applyReplace(source, selectedColor)
+                                }
+                            }) { Text("Confirm") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showReplaceConfirmDialog = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
                 if (showLoadDialog) {
                     val savedPatterns = remember { getSavedPatterns(context) }
                     Dialog(onDismissRequest = { showLoadDialog = false }) {
@@ -412,7 +442,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            val onColorChange: (Int, Color) -> Unit = { index, color ->
+                            val onColorChange: (Int, Color) -> Unit = label@{ index, color ->
+                                if (toolMode == ToolMode.REPLACE) {
+                                    if (pickSourceArmed && index in pattern.indices) {
+                                        replaceSourceColor = pattern[index]
+                                        pickSourceArmed = false
+                                    }
+                                    return@label
+                                }
                                 val newPattern = pattern.toMutableList()
                                 val col = index % gridSize
                                 val row = index / gridSize
@@ -490,8 +527,10 @@ class MainActivity : ComponentActivity() {
                                                 if (col in 0 until gridSize && row in 0 until gridSize) {
                                                     val index = row * gridSize + col
                                                     if (index in pattern.indices && index != lastIndex) {
-                                                        onColorChange(index, selectedColor)
-                                                        lastIndex = index
+                                                        if (toolMode == ToolMode.BRUSH) {
+                                                            onColorChange(index, selectedColor)
+                                                            lastIndex = index
+                                                        }
                                                     }
                                                 }
                                                 change.consume()
@@ -510,7 +549,12 @@ class MainActivity : ComponentActivity() {
                                                 if (col in 0 until gridSize && row in 0 until gridSize) {
                                                     val index = row * gridSize + col
                                                     if (index in pattern.indices) {
-                                                        onColorChange(index, selectedColor)
+                                                        if (toolMode == ToolMode.BRUSH) {
+                                                            onColorChange(index, selectedColor)
+                                                        } else if (toolMode == ToolMode.REPLACE && pickSourceArmed) {
+                                                            replaceSourceColor = pattern[index]
+                                                            pickSourceArmed = false
+                                                        }
                                                     }
                                                 }
                                             }
@@ -574,6 +618,57 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Surface(modifier = Modifier.fillMaxHeight(0.5f), shadowElevation = 8.dp) {
                                 Column(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    toolMode = ToolMode.BRUSH
+                                                    pickSourceArmed = false
+                                                },
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Brush") }
+                                            Button(
+                                                onClick = { toolMode = ToolMode.REPLACE },
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Replace") }
+                                        }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Button(
+                                                onClick = { pickSourceArmed = true },
+                                                enabled = toolMode == ToolMode.REPLACE,
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Pick Source") }
+                                            Button(
+                                                onClick = { showReplaceConfirmDialog = true },
+                                                enabled = toolMode == ToolMode.REPLACE && replaceSourceColor != null,
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Apply Replace") }
+                                        }
+                                        if (toolMode == ToolMode.REPLACE) {
+                                            val sourceText = if (replaceSourceColor == null) {
+                                                "Source: none"
+                                            } else {
+                                                "Source: selected"
+                                            }
+                                            Text(
+                                                sourceText,
+                                                modifier = Modifier.padding(top = 8.dp)
+                                            )
+                                        }
+                                    }
                                     TabRow(
                                         selectedTabIndex = selectedPaletteTab,
                                         modifier = Modifier.fillMaxWidth()
