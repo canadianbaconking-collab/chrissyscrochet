@@ -351,93 +351,99 @@ class MainActivity : ComponentActivity() {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RectangleShape)
-                                    .onSizeChanged { layoutSize = it }
-                                    .pointerInput(Unit) {
-                                        detectTransformGestures { _, pan, zoom, _ ->
-                                            scale = (scale * zoom).coerceIn(0.5f, 5f)
-                                            offset += pan
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        var lastIndex: Int? = null
-                                        detectDragGestures(
-                                            onDragEnd = { lastIndex = null },
-                                            onDragCancel = { lastIndex = null }
-                                        ) { change, _ ->
-                                            val position = change.position
-                                            val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
-
-                                            val transformedX = (position.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
-                                            val transformedY = (position.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
-
-                                            val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
-                                            val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
-
-                                            if (col in 0 until gridSize && row in 0 until gridSize) {
-                                                val index = row * gridSize + col
-                                                if (index in pattern.indices && index != lastIndex) {
-                                                    onColorChange(index, selectedColor)
-                                                    lastIndex = index
-                                                }
-                                            }
-                                            change.consume()
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { tapOffset ->
-                                            val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
-
-                                            val transformedX = (tapOffset.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
-                                            val transformedY = (tapOffset.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
-
-                                            val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
-                                            val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
-
-                                            if (col in 0 until gridSize && row in 0 until gridSize) {
-                                                val index = row * gridSize + col
-                                                if (index in pattern.indices) {
-                                                    onColorChange(index, selectedColor)
-                                                }
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                                    .padding(24.dp)
                             ) {
-                                PatternGrid(
-                                    modifier = Modifier.graphicsLayer(
-                                        scaleX = scale,
-                                        scaleY = scale,
-                                        translationX = offset.x,
-                                        translationY = offset.y
-                                    ),
-                                    pattern = pattern,
-                                    gridSize = gridSize,
-                                    onColorChange = onColorChange,
-                                    selectedColor = selectedColor
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RectangleShape)
+                                        .onSizeChanged { layoutSize = it }
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, pan, zoom, _ ->
+                                                scale = (scale * zoom).coerceIn(0.5f, 5f)
+                                                offset += pan
+                                            }
+                                        }
+                                        .pointerInput(Unit) {
+                                            var lastIndex: Int? = null
+                                            detectDragGestures(
+                                                onDragEnd = { lastIndex = null },
+                                                onDragCancel = { lastIndex = null }
+                                            ) { change, _ ->
+                                                val position = change.position
+                                                val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
 
-                                if (gridSize % 2 == 0) {
-                                    Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val strokeWidth = 2.dp.toPx()
-                                        val gridActualSize = size.width.coerceAtMost(size.height)
-                                        val gridTopY = (size.height - gridActualSize) / 2f
-                                        val gridBottomY = gridTopY + gridActualSize
-                                        val gridLeftX = (size.width - gridActualSize) / 2f
-                                        val gridRightX = gridLeftX + gridActualSize
-                                        
-                                        drawLine(
-                                            color = Color.Black.copy(alpha = 0.5f),
-                                            start = Offset(x = center.x, y = gridTopY),
-                                            end = Offset(x = center.x, y = gridBottomY),
-                                            strokeWidth = strokeWidth
-                                        )
-                                        drawLine(
-                                            color = Color.Black.copy(alpha = 0.5f),
-                                            start = Offset(x = gridLeftX, y = center.y),
-                                            end = Offset(x = gridRightX, y = center.y),
-                                            strokeWidth = strokeWidth
-                                        )
+                                                val transformedX = (position.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
+                                                val transformedY = (position.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
+
+                                                val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
+                                                val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
+
+                                                if (col in 0 until gridSize && row in 0 until gridSize) {
+                                                    val index = row * gridSize + col
+                                                    if (index in pattern.indices && index != lastIndex) {
+                                                        onColorChange(index, selectedColor)
+                                                        lastIndex = index
+                                                    }
+                                                }
+                                                change.consume()
+                                            }
+                                        }
+                                        .pointerInput(Unit) {
+                                            detectTapGestures { tapOffset ->
+                                                val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
+
+                                                val transformedX = (tapOffset.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
+                                                val transformedY = (tapOffset.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
+
+                                                val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
+                                                val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
+
+                                                if (col in 0 until gridSize && row in 0 until gridSize) {
+                                                    val index = row * gridSize + col
+                                                    if (index in pattern.indices) {
+                                                        onColorChange(index, selectedColor)
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    PatternGrid(
+                                        modifier = Modifier.graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        ),
+                                        pattern = pattern,
+                                        gridSize = gridSize,
+                                        onColorChange = onColorChange,
+                                        selectedColor = selectedColor
+                                    )
+
+                                    if (gridSize % 2 == 0) {
+                                        Canvas(modifier = Modifier.fillMaxSize()) {
+                                            val strokeWidth = 2.dp.toPx()
+                                            val gridActualSize = size.width.coerceAtMost(size.height)
+                                            val gridTopY = (size.height - gridActualSize) / 2f
+                                            val gridBottomY = gridTopY + gridActualSize
+                                            val gridLeftX = (size.width - gridActualSize) / 2f
+                                            val gridRightX = gridLeftX + gridActualSize
+
+                                            drawLine(
+                                                color = Color.Black.copy(alpha = 0.5f),
+                                                start = Offset(x = center.x, y = gridTopY),
+                                                end = Offset(x = center.x, y = gridBottomY),
+                                                strokeWidth = strokeWidth
+                                            )
+                                            drawLine(
+                                                color = Color.Black.copy(alpha = 0.5f),
+                                                start = Offset(x = gridLeftX, y = center.y),
+                                                end = Offset(x = gridRightX, y = center.y),
+                                                strokeWidth = strokeWidth
+                                            )
+                                        }
                                     }
                                 }
                             }
