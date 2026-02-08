@@ -96,6 +96,9 @@ class MainActivity : ComponentActivity() {
                 var paletteVisible by remember { mutableStateOf(false) }
                 var showSaveDialog by remember { mutableStateOf(false) }
                 var showLoadDialog by remember { mutableStateOf(false) }
+                var showNewConfirmDialog by remember { mutableStateOf(false) }
+                var showLoadConfirmDialog by remember { mutableStateOf(false) }
+                var pendingLoadName by remember { mutableStateOf<String?>(null) }
                 var filename by remember { mutableStateOf("") }
                 val context = LocalContext.current
 
@@ -125,6 +128,67 @@ class MainActivity : ComponentActivity() {
                     updatePattern(List(newSize * newSize) { Color.White }, reset = true)
                     scale = 1f
                     offset = Offset.Zero
+                }
+
+                fun startNewPattern() {
+                    updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
+                    scale = 1f
+                    offset = Offset.Zero
+                }
+
+                fun loadPatternByName(name: String) {
+                    val loadedPattern = loadPattern(context, name, gridSize)
+                    if (loadedPattern.isNotEmpty()) {
+                        if (loadedPattern.size == gridSize * gridSize) {
+                            updatePattern(loadedPattern)
+                            Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Pattern size mismatch", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Failed to load", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                if (showNewConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showNewConfirmDialog = false },
+                        title = { Text("New Pattern?") },
+                        text = { Text("This will clear the current pattern.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                showNewConfirmDialog = false
+                                startNewPattern()
+                            }) { Text("Confirm") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showNewConfirmDialog = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (showLoadConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showLoadConfirmDialog = false },
+                        title = { Text("Load Pattern?") },
+                        text = { Text("Loading will replace the current pattern.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                val name = pendingLoadName
+                                showLoadConfirmDialog = false
+                                pendingLoadName = null
+                                if (name != null) {
+                                    loadPatternByName(name)
+                                }
+                            }) { Text("Confirm") }
+                        },
+                        dismissButton = {
+                            Button(onClick = {
+                                showLoadConfirmDialog = false
+                                pendingLoadName = null
+                            }) { Text("Cancel") }
+                        }
+                    )
                 }
 
                 if (showSaveDialog) {
@@ -189,17 +253,8 @@ class MainActivity : ComponentActivity() {
                                         items(savedPatterns) { savedPattern ->
                                             Card(
                                                 modifier = Modifier.clickable {
-                                                    val loadedPattern = loadPattern(context, savedPattern.name, gridSize)
-                                                    if (loadedPattern.isNotEmpty()) {
-                                                        if (loadedPattern.size == gridSize * gridSize) {
-                                                            updatePattern(loadedPattern)
-                                                            Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Pattern size mismatch", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    } else {
-                                                        Toast.makeText(context, "Failed to load", Toast.LENGTH_SHORT).show()
-                                                    }
+                                                    pendingLoadName = savedPattern.name
+                                                    showLoadConfirmDialog = true
                                                     showLoadDialog = false
                                                 }
                                             ) {
@@ -253,11 +308,7 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row {
-                                    Button(onClick = {
-                                        updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
-                                        scale = 1f
-                                        offset = Offset.Zero
-                                    }) { Text("New") }
+                                    Button(onClick = { showNewConfirmDialog = true }) { Text("New") }
                                     Spacer(Modifier.width(8.dp))
                                     Button(onClick = { showSaveDialog = true }) { Text("Save") }
                                     Spacer(Modifier.width(8.dp))
