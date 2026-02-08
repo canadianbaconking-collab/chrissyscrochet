@@ -40,6 +40,46 @@ val crochetColorHexes = listOf(
     "#8B4513"  // Brown
 )
 
+val pastelPaletteHexes = listOf(
+    "#FFD1DC", // Pastel Pink
+    "#FFE5B4", // Peach
+    "#FFFACD", // Lemon Chiffon
+    "#E0FFFF", // Light Cyan
+    "#E6E6FA", // Lavender
+    "#F0E68C", // Khaki
+    "#D8BFD8", // Thistle
+    "#D1E8E2", // Mint
+    "#FADADD", // Light Rose
+    "#C1E1C1", // Pastel Green
+    "#B5EAD7", // Seafoam
+    "#C7CEEA", // Periwinkle
+    "#FFDAC1", // Apricot
+    "#E2F0CB", // Pale Green
+    "#BFD7EA", // Powder Blue
+    "#F1CBFF"  // Lilac
+)
+
+val metallicPaletteHexes = listOf(
+    "#C0C0C0", // Silver
+    "#B87333", // Copper
+    "#D4AF37", // Gold
+    "#E5E4E2", // Platinum
+    "#9C7A3C", // Bronze
+    "#8A8D8F", // Steel
+    "#A9A9A9", // Dark Silver
+    "#6E6E6E", // Gunmetal
+    "#D9D6CF", // Pewter
+    "#B5A642", // Brass
+    "#AAA9AD", // Tin
+    "#7A7A7A", // Iron
+    "#C5C3C6", // Nickel
+    "#C4A484", // Satin Gold
+    "#A67C52", // Bronze Brown
+    "#C9B037"  // Trophy Gold
+)
+
+val brightPaletteHexes = crochetColorHexes
+
 @Composable
 fun ColorPalette(
     colorsHex: List<String>,

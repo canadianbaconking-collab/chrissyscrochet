@@ -48,6 +48,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -86,8 +88,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                var paletteHexColors by remember { mutableStateOf(crochetColorHexes) }
+                var pastelHexColors by remember { mutableStateOf(pastelPaletteHexes) }
+                var metallicHexColors by remember { mutableStateOf(metallicPaletteHexes) }
+                var brightHexColors by remember { mutableStateOf(brightPaletteHexes) }
+                var customHexColors by remember { mutableStateOf(listOf(brightPaletteHexes.first())) }
+                var selectedPaletteTab by remember { mutableIntStateOf(0) }
                 var selectedColorIndex by remember { mutableIntStateOf(0) }
+                val paletteHexColors = when (selectedPaletteTab) {
+                    0 -> pastelHexColors
+                    1 -> metallicHexColors
+                    2 -> brightHexColors
+                    else -> customHexColors
+                }
                 val selectedColor = hexToColor(paletteHexColors[selectedColorIndex])
                 var gridSize by remember { mutableIntStateOf(36) }
 
@@ -110,6 +122,11 @@ class MainActivity : ComponentActivity() {
                 var layoutSize by remember { mutableStateOf(IntSize.Zero) }
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
                 var symmetryOptionsVisible by remember { mutableStateOf(false) }
+
+                fun selectIndexForPalette(currentHex: String, palette: List<String>): Int {
+                    val index = palette.indexOf(currentHex)
+                    return if (index >= 0) index else 0
+                }
 
                 fun updatePattern(newPattern: List<Color>, reset: Boolean = false) {
                     val newHistory = if (reset) {
@@ -201,7 +218,20 @@ class MainActivity : ComponentActivity() {
                                     if (newHex != null) {
                                         val updated = paletteHexColors.toMutableList()
                                         updated[selectedColorIndex] = newHex
-                                        paletteHexColors = updated
+                                        when (selectedPaletteTab) {
+                                            0 -> pastelHexColors = updated
+                                            1 -> metallicHexColors = updated
+                                            2 -> brightHexColors = updated
+                                            else -> customHexColors = updated
+                                        }
+                                        val shouldAddToCustom = if (selectedPaletteTab == 3) {
+                                            !updated.contains(newHex)
+                                        } else {
+                                            !customHexColors.contains(newHex)
+                                        }
+                                        if (shouldAddToCustom) {
+                                            customHexColors = customHexColors + newHex
+                                        }
                                         showEditHexDialog = false
                                     }
                                 },
@@ -544,6 +574,29 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Surface(modifier = Modifier.fillMaxHeight(0.5f), shadowElevation = 8.dp) {
                                 Column(modifier = Modifier.fillMaxSize()) {
+                                    TabRow(
+                                        selectedTabIndex = selectedPaletteTab,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        listOf("Pastel", "Metallic", "Bright", "Custom").forEachIndexed { index, label ->
+                                            Tab(
+                                                selected = selectedPaletteTab == index,
+                                                onClick = {
+                                                    val currentHex = paletteHexColors[selectedColorIndex]
+                                                    selectedPaletteTab = index
+                                                    val nextPalette = when (index) {
+                                                        0 -> pastelHexColors
+                                                        1 -> metallicHexColors
+                                                        2 -> brightHexColors
+                                                        else -> customHexColors
+                                                    }
+                                                    selectedColorIndex = selectIndexForPalette(currentHex, nextPalette)
+                                                },
+                                                text = { Text(label, maxLines = 1) },
+                                                modifier = Modifier.padding(vertical = 8.dp)
+                                            )
+                                        }
+                                    }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
