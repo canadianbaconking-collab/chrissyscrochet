@@ -253,15 +253,15 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row {
-                                    Button(onClick = { showLoadDialog = true }) { Text("Load") }
-                                    Spacer(Modifier.width(8.dp))
-                                    Button(onClick = { showSaveDialog = true }) { Text("Save") }
-                                    Spacer(Modifier.width(8.dp))
                                     Button(onClick = {
                                         updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
                                         scale = 1f
                                         offset = Offset.Zero
                                     }) { Text("New") }
+                                    Spacer(Modifier.width(8.dp))
+                                    Button(onClick = { showSaveDialog = true }) { Text("Save") }
+                                    Spacer(Modifier.width(8.dp))
+                                    Button(onClick = { showLoadDialog = true }) { Text("Load") }
                                 }
                                 Row {
                                     IconButton(
