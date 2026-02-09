@@ -50,24 +50,43 @@ private fun colorToHex(color: Color): String {
     )
 }
 
-fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
+fun nextAvailablePatternName(requestedName: String, existingNames: Set<String>): String {
+    val trimmed = requestedName.trim()
+    if (trimmed.isEmpty()) return requestedName
+    if (!existingNames.contains(trimmed)) return trimmed
+
+    var suffix = 1
+    while (true) {
+        val candidate = "$trimmed ($suffix)"
+        if (!existingNames.contains(candidate)) return candidate
+        suffix++
+    }
+}
+
+fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSize: Int): String? {
     return try {
         val dir = File(context.filesDir, "patterns")
         if (!dir.exists()) dir.mkdirs()
 
-        val file = File(dir, "$filename.txt")
+        val existingNames = (dir.listFiles() ?: emptyArray())
+            .filter { it.extension == "txt" }
+            .map { it.nameWithoutExtension }
+            .toSet()
+        val actualName = nextAvailablePatternName(filename, existingNames)
+
+        val file = File(dir, "$actualName.txt")
         file.writeText(pattern.joinToString(",") { colorToHex(it) })
 
         val bitmap = createPatternBitmap(pattern, gridSize)
-        val thumbnailFile = File(dir, "${filename}_thumb.png")
+        val thumbnailFile = File(dir, "${actualName}_thumb.png")
         FileOutputStream(thumbnailFile).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
         bitmap.recycle()
-        true
+        actualName
     } catch (e: IOException) {
         e.printStackTrace()
-        false
+        null
     }
 }
 
@@ -186,29 +205,40 @@ fun getSavedPatterns(context: Context): List<SavedPattern> {
     }
 }
 
-fun exportPatternToImage(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
+fun deleteSavedPattern(context: Context, filename: String): Boolean {
+    val dir = File(context.filesDir, "patterns")
+    if (!dir.exists()) return false
+
+    val patternFile = File(dir, "$filename.txt")
+    val thumbFile = File(dir, "${filename}_thumb.png")
+    val patternDeletedOrMissing = !patternFile.exists() || patternFile.delete()
+    val thumbDeletedOrMissing = !thumbFile.exists() || thumbFile.delete()
+    return patternDeletedOrMissing && thumbDeletedOrMissing
+}
+
+fun exportPatternToJpg(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
     return try {
         val bitmap = createPatternBitmap(pattern, gridSize, scale = 10)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "$filename.png")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.DISPLAY_NAME, "$filename.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
             }
 
             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             uri?.let {
                 context.contentResolver.openOutputStream(it).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out!!)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out!!)
                 }
             }
         } else {
             @Suppress("DEPRECATION")
             val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val file = File(picturesDir, "$filename.png")
+            val file = File(picturesDir, "$filename.jpg")
             FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
             }
         }
         bitmap.recycle()

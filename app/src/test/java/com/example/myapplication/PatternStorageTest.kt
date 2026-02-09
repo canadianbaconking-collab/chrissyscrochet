@@ -6,6 +6,21 @@ import org.junit.Test
 
 class PatternStorageTest {
     @Test
+    fun nextAvailablePatternName_returnsBaseWhenUnused() {
+        val out = nextAvailablePatternName("Rose", setOf("Tulip", "Lily"))
+        assertEquals("Rose", out)
+    }
+
+    @Test
+    fun nextAvailablePatternName_appendsNumericSuffix() {
+        val out = nextAvailablePatternName(
+            "Rose",
+            setOf("Rose", "Rose (1)", "Rose (2)", "Tulip")
+        )
+        assertEquals("Rose (3)", out)
+    }
+
+    @Test
     fun transformPatternCenterPadsFrom2To4() {
         val src = listOf(
             Color(0xFF000001L), Color(0xFF000002L),

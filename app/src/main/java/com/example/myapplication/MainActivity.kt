@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -91,15 +92,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlin.math.sqrt
 
@@ -142,13 +144,16 @@ class MainActivity : ComponentActivity() {
                 var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
+                var pendingDeleteName by remember { mutableStateOf<String?>(null) }
                 var pendingMismatch by remember { mutableStateOf<SizeMismatchState?>(null) }
                 var showNewConfirmDialog by remember { mutableStateOf(false) }
+                var showDeletePatternDialog by remember { mutableStateOf(false) }
                 var toolMode by remember { mutableStateOf(ToolMode.BRUSH) }
                 var replaceSourceColor by remember { mutableStateOf<Color?>(null) }
                 var pickSourceArmed by remember { mutableStateOf(false) }
                 var showReplaceConfirmDialog by remember { mutableStateOf(false) }
                 var filename by remember { mutableStateOf("") }
+                var savedPatternsVersion by remember { mutableIntStateOf(0) }
                 val context = LocalContext.current
 
                 var scale by remember { mutableStateOf(1f) }
@@ -223,14 +228,41 @@ class MainActivity : ComponentActivity() {
                 }
 
                 fun saveCurrentPattern(nameToSave: String): Boolean {
-                    val success = savePattern(context, nameToSave, pattern, gridSize)
-                    if (success) {
-                        filename = nameToSave
-                        Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
+                    val savedName = savePattern(context, nameToSave, pattern, gridSize)
+                    if (savedName != null) {
+                        filename = savedName
+                        savedPatternsVersion++
+                        Toast.makeText(context, "Saved as $savedName", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show()
                     }
-                    return success
+                    return savedName != null
+                }
+
+                fun exportCurrentPattern() {
+                    val baseName = filename.trim().ifBlank {
+                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                        "pattern_$timestamp"
+                    }
+                    val exported = exportPatternToJpg(context, baseName, pattern, gridSize)
+                    if (exported) {
+                        Toast.makeText(context, "Exported to Photos", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed to export", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                fun deletePatternByName(name: String) {
+                    val deleted = deleteSavedPattern(context, name)
+                    if (deleted) {
+                        savedPatternsVersion++
+                        if (filename == name) {
+                            filename = ""
+                        }
+                        Toast.makeText(context, "Deleted $name", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed to delete $name", Toast.LENGTH_SHORT).show()
+                    }
                 }
 
                 fun loadPatternByName(name: String) {
@@ -323,6 +355,38 @@ class MainActivity : ComponentActivity() {
                                 }) { Text("Center on ${mismatch.currentSize}x${mismatch.currentSize}") }
                                 TextButton(onClick = { clearPendingLoadState() }) { Text("Cancel") }
                             }
+                        }
+                    )
+                }
+
+                if (showDeletePatternDialog) {
+                    val nameToDelete = pendingDeleteName
+                    AlertDialog(
+                        onDismissRequest = {
+                            showDeletePatternDialog = false
+                            pendingDeleteName = null
+                        },
+                        title = { Text("Delete pattern?") },
+                        text = { Text("Delete ${nameToDelete.orEmpty()}?") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val target = pendingDeleteName
+                                    showDeletePatternDialog = false
+                                    pendingDeleteName = null
+                                    if (!target.isNullOrBlank()) {
+                                        deletePatternByName(target)
+                                    }
+                                }
+                            ) { Text("Delete") }
+                        },
+                        dismissButton = {
+                            Button(
+                                onClick = {
+                                    showDeletePatternDialog = false
+                                    pendingDeleteName = null
+                                }
+                            ) { Text("Cancel") }
                         }
                     )
                 }
@@ -495,7 +559,9 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showLoadDialog) {
-                    val savedPatterns = getSavedPatterns(context)
+                    val savedPatterns = remember(showLoadDialog, savedPatternsVersion) {
+                        getSavedPatterns(context)
+                    }
                     Dialog(onDismissRequest = { showLoadDialog = false }) {
                         Surface(modifier = Modifier.padding(16.dp)) {
                             Column {
@@ -526,6 +592,25 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             ) {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(end = 2.dp),
+                                                        horizontalArrangement = Arrangement.End
+                                                    ) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                pendingDeleteName = savedPattern.name
+                                                                showDeletePatternDialog = true
+                                                            },
+                                                            modifier = Modifier.size(28.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Filled.Close,
+                                                                contentDescription = "Delete ${savedPattern.name}"
+                                                            )
+                                                        }
+                                                    }
                                                     val bitmap = remember(savedPattern.thumbnailUrl) {
                                                         loadBitmapSafely(savedPattern.thumbnailUrl)
                                                     }
@@ -570,13 +655,7 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             TopAppBar(
-                                title = {
-                                    Text(
-                                        text = stringResource(R.string.app_name),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
+                                title = {},
                                 actions = {
                                     IconButton(onClick = { showNewConfirmDialog = true }) {
                                         Icon(Icons.Filled.Add, contentDescription = "New")
@@ -591,8 +670,11 @@ class MainActivity : ComponentActivity() {
                                     }) {
                                         Icon(Icons.Filled.Save, contentDescription = "Save")
                                     }
+                                    IconButton(onClick = { exportCurrentPattern() }) {
+                                        Icon(Icons.Filled.Download, contentDescription = "Export JPG")
+                                    }
                                     IconButton(onClick = { showLoadDialog = true }) {
-                                        Icon(Icons.Filled.Download, contentDescription = "Load")
+                                        Icon(Icons.Filled.FolderOpen, contentDescription = "Load")
                                     }
                                     IconButton(
                                         onClick = {
