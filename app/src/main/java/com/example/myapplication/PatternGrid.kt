@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 fun PatternGrid(
@@ -19,9 +20,12 @@ fun PatternGrid(
     pattern: List<Color>,
     gridSize: Int,
     onColorChange: (Int, Color) -> Unit,
-    selectedColor: Color,
-    showGridLines: Boolean
+    selectedColor: Color
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val gridLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.22f)
+    val centerLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.75f)
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
         modifier = modifier,
@@ -39,15 +43,9 @@ fun PatternGrid(
                 modifier = Modifier
                     .aspectRatio(1f)
                     .background(color)
-                    .then(
-                        if (showGridLines) {
-                            Modifier.border(
-                                width = if (isCenterCell) 1.5.dp else 0.5.dp,
-                                color = if (isCenterCell) Color.Black.copy(alpha = 0.8f) else Color.LightGray
-                            )
-                        } else {
-                            Modifier
-                        }
+                    .border(
+                        width = if (isCenterCell) 1.5.dp else 0.5.dp,
+                        color = if (isCenterCell) centerLineColor else gridLineColor
                     )
                     .clickable {
                         // Eyedropper removed, always change color on click

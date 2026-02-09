@@ -9,6 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
@@ -22,14 +25,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -59,13 +63,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -84,13 +88,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import java.io.File
+import kotlinx.coroutines.delay
 import kotlin.math.sqrt
 
 enum class SymmetryMode { NONE, VERTICAL, HORIZONTAL, QUADRANT }
@@ -144,8 +152,14 @@ class MainActivity : ComponentActivity() {
                 var offset by remember { mutableStateOf(Offset.Zero) }
                 var layoutSize by remember { mutableStateOf(IntSize.Zero) }
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
-                var showGridLines by remember { mutableStateOf(true) }
                 var showMirrorOptions by remember { mutableStateOf(false) }
+                var showComposeSplashOverlay by remember { mutableStateOf(true) }
+                val isDarkTheme = isSystemInDarkTheme()
+
+                LaunchedEffect(Unit) {
+                    delay(700)
+                    showComposeSplashOverlay = false
+                }
 
                 fun selectIndexForPalette(currentHex: String, palette: List<String>): Int {
                     val index = palette.indexOf(currentHex)
@@ -503,7 +517,11 @@ class MainActivity : ComponentActivity() {
                         Column(modifier = Modifier.fillMaxSize()) {
                             TopAppBar(
                                 title = {
-                                    Text(if (filename.isBlank()) "Chrissy's Crochet" else filename)
+                                    Text(
+                                        text = stringResource(R.string.app_name),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 },
                                 actions = {
                                     IconButton(onClick = { showNewConfirmDialog = true }) {
@@ -554,16 +572,6 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
                                     }
-                                    IconButton(onClick = {
-                                        val success = exportPatternToImage(context, "CrochetPattern", pattern, gridSize)
-                                        Toast.makeText(
-                                            context,
-                                            if (success) "Saved to Pictures" else "Save failed",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }) {
-                                        Icon(Icons.Filled.Save, contentDescription = "Export")
-                                    }
                                 }
                             )
                             
@@ -581,20 +589,6 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Grid lines")
-                                Spacer(Modifier.width(12.dp))
-                                Switch(
-                                    checked = showGridLines,
-                                    onCheckedChange = { showGridLines = it }
-                                )
-                            }
-
                             val onColorChange: (Int, Color) -> Unit = label@{ index, color ->
                                 if (toolMode == ToolMode.REPLACE) {
                                     if (pickSourceArmed && index in pattern.indices) {
@@ -654,6 +648,7 @@ class MainActivity : ComponentActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .background(if (isDarkTheme) Color.Black else MaterialTheme.colorScheme.surface)
                                         .clip(RectangleShape)
                                         .onSizeChanged { layoutSize = it }
                                         .pointerInput(Unit) {
@@ -724,12 +719,15 @@ class MainActivity : ComponentActivity() {
                                         pattern = pattern,
                                         gridSize = gridSize,
                                         onColorChange = onColorChange,
-                                        selectedColor = selectedColor,
-                                        showGridLines = showGridLines
+                                        selectedColor = selectedColor
                                     )
 
-                                    if (showGridLines && gridSize % 2 == 0) {
-                                        val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    if (gridSize % 2 == 0) {
+                                        val axisColor = if (isDarkTheme) {
+                                            Color.White.copy(alpha = 0.9f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                        }
                                         Canvas(modifier = Modifier.fillMaxSize()) {
                                             val strokeWidth = 2.dp.toPx()
                                             val gridActualSize = size.width.coerceAtMost(size.height)
@@ -854,12 +852,37 @@ class MainActivity : ComponentActivity() {
                                 label = { Text("Mirror") }
                             )
                         }
+
+                        AnimatedVisibility(
+                            visible = showComposeSplashOverlay,
+                            modifier = Modifier.fillMaxSize(),
+                            enter = fadeIn(animationSpec = tween(120)),
+                            exit = fadeOut(animationSpec = tween(250))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.cc_splash),
+                                    contentDescription = "Splash Branding",
+                                    modifier = Modifier.fillMaxWidth(0.9f),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
                     }
                 }
 
                 if (paletteVisible) {
                     ModalBottomSheet(onDismissRequest = { paletteVisible = false }) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.9f)
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -874,7 +897,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             Column(
-                                modifier = Modifier.verticalScroll(rememberScrollState())
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState())
                             ) {
                                 val paletteLabels = listOf("Pastel", "Metallic", "Bright", "Custom")
                                 LazyRow(
@@ -913,10 +939,14 @@ class MainActivity : ComponentActivity() {
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
                                     horizontalArrangement = Arrangement.End
                                 ) {
-                                    Button(onClick = {
-                                        hexInput = paletteHexColors[selectedColorIndex]
-                                        showEditHexDialog = true
-                                    }) { Text("Edit Hex") }
+                                    TextButton(
+                                        onClick = {
+                                            hexInput = paletteHexColors[selectedColorIndex]
+                                            showEditHexDialog = true
+                                        },
+                                        modifier = Modifier.heightIn(min = 36.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) { Text("Edit Hex") }
                                 }
 
                                 ColorPalette(
