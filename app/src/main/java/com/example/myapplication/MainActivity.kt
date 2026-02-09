@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                 var renameTabInputs by remember { mutableStateOf(paletteLabels) }
 
                 LaunchedEffect(Unit) {
-                    delay(700)
+                    delay(420)
                     showComposeSplashOverlay = false
                 }
 
@@ -1014,8 +1014,8 @@ class MainActivity : ComponentActivity() {
                         AnimatedVisibility(
                             visible = showComposeSplashOverlay,
                             modifier = Modifier.fillMaxSize(),
-                            enter = fadeIn(animationSpec = tween(120)),
-                            exit = fadeOut(animationSpec = tween(250))
+                            enter = fadeIn(animationSpec = tween(80)),
+                            exit = fadeOut(animationSpec = tween(180))
                         ) {
                             Box(
                                 modifier = Modifier
