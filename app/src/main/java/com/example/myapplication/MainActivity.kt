@@ -17,6 +17,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,24 +38,32 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
@@ -88,6 +98,7 @@ enum class ToolMode { BRUSH, REPLACE }
 data class SizeMismatchState(val raw: RawPattern, val currentSize: Int)
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -134,6 +145,7 @@ class MainActivity : ComponentActivity() {
                 var layoutSize by remember { mutableStateOf(IntSize.Zero) }
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
                 var showGridLines by remember { mutableStateOf(true) }
+                var showMirrorOptions by remember { mutableStateOf(false) }
 
                 fun selectIndexForPalette(currentHex: String, palette: List<String>): Int {
                     val index = palette.indexOf(currentHex)
@@ -183,6 +195,18 @@ class MainActivity : ComponentActivity() {
                     updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
                     scale = 1f
                     offset = Offset.Zero
+                    filename = ""
+                }
+
+                fun saveCurrentPattern(nameToSave: String): Boolean {
+                    val success = savePattern(context, nameToSave, pattern, gridSize)
+                    if (success) {
+                        filename = nameToSave
+                        Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show()
+                    }
+                    return success
                 }
 
                 fun loadPatternByName(name: String) {
@@ -197,6 +221,7 @@ class MainActivity : ComponentActivity() {
                     if (raw.size == gridSize) {
                         updatePattern(raw.colors)
                         Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                        filename = name
                         clearPendingLoadState()
                         return
                     }
@@ -244,17 +269,22 @@ class MainActivity : ComponentActivity() {
                         confirmButton = {
                             Button(onClick = {
                                 val raw = mismatch.raw
+                                val loadedName = pendingLoadName
                                 gridSize = raw.size
                                 updatePattern(raw.colors)
                                 scale = 1f
                                 offset = Offset.Zero
                                 Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                                if (!loadedName.isNullOrBlank()) {
+                                    filename = loadedName
+                                }
                                 clearPendingLoadState()
                             }) { Text("Switch to ${mismatch.raw.size}x${mismatch.raw.size} and load") }
                         },
                         dismissButton = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = {
+                                    val loadedName = pendingLoadName
                                     val transformed = transformPatternCenter(
                                         mismatch.raw,
                                         mismatch.currentSize,
@@ -262,6 +292,9 @@ class MainActivity : ComponentActivity() {
                                     )
                                     updatePattern(transformed)
                                     Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
+                                    if (!loadedName.isNullOrBlank()) {
+                                        filename = loadedName
+                                    }
                                     clearPendingLoadState()
                                 }) { Text("Center on ${mismatch.currentSize}x${mismatch.currentSize}") }
                                 TextButton(onClick = { clearPendingLoadState() }) { Text("Cancel") }
@@ -346,35 +379,29 @@ class MainActivity : ComponentActivity() {
                 if (showSaveDialog) {
                     AlertDialog(
                         onDismissRequest = { showSaveDialog = false },
-                        title = { Text("Save Pattern") },
+                        title = { Text("Name Pattern") },
                         text = {
                             TextField(
                                 value = filename,
                                 onValueChange = { filename = it },
-                                label = { Text("Filename") }
+                                label = { Text("Pattern name") },
+                                singleLine = true
                             )
                         },
                         confirmButton = {
                             Button(
                                 onClick = {
-                                    if (filename.isNotBlank()) {
-                                        val success = savePattern(context, filename, pattern, gridSize)
-                                        if (success) {
-                                            Toast.makeText(context, "Pattern saved", Toast.LENGTH_SHORT).show()
+                                    val enteredName = filename.trim()
+                                    if (enteredName.isNotBlank()) {
+                                        if (saveCurrentPattern(enteredName)) {
                                             showSaveDialog = false
-                                            filename = ""
-                                        } else {
-                                            Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                             ) { Text("Save") }
                         },
                         dismissButton = {
-                            Button(onClick = {
-                                showSaveDialog = false
-                                filename = ""
-                            }) { Text("Cancel") }
+                            Button(onClick = { showSaveDialog = false }) { Text("Cancel") }
                         }
                     )
                 }
@@ -400,7 +427,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showLoadDialog) {
-                    val savedPatterns = remember { getSavedPatterns(context) }
+                    val savedPatterns = getSavedPatterns(context)
                     Dialog(onDismissRequest = { showLoadDialog = false }) {
                         Surface(modifier = Modifier.padding(16.dp)) {
                             Column {
@@ -474,19 +501,27 @@ class MainActivity : ComponentActivity() {
                 Scaffold { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row {
-                                    Button(onClick = { showNewConfirmDialog = true }) { Text("New") }
-                                    Spacer(Modifier.width(8.dp))
-                                    Button(onClick = { showSaveDialog = true }) { Text("Save") }
-                                    Spacer(Modifier.width(8.dp))
-                                    Button(onClick = { showLoadDialog = true }) { Text("Load") }
-                                }
-                                Row {
+                            TopAppBar(
+                                title = {
+                                    Text(if (filename.isBlank()) "Chrissy's Crochet" else filename)
+                                },
+                                actions = {
+                                    IconButton(onClick = { showNewConfirmDialog = true }) {
+                                        Icon(Icons.Filled.Add, contentDescription = "New")
+                                    }
+                                    IconButton(onClick = {
+                                        val currentName = filename.trim()
+                                        if (currentName.isBlank()) {
+                                            showSaveDialog = true
+                                        } else {
+                                            saveCurrentPattern(currentName)
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Save, contentDescription = "Save")
+                                    }
+                                    IconButton(onClick = { showLoadDialog = true }) {
+                                        Icon(Icons.Filled.Download, contentDescription = "Load")
+                                    }
                                     IconButton(
                                         onClick = {
                                             if (historyIndex > 0) {
@@ -501,7 +536,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         enabled = historyIndex > 0
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.Undo, "Undo")
+                                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
                                     }
                                     IconButton(
                                         onClick = {
@@ -517,7 +552,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         enabled = historyIndex < history.lastIndex
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.Redo, "Redo")
+                                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
                                     }
                                     IconButton(onClick = {
                                         val success = exportPatternToImage(context, "CrochetPattern", pattern, gridSize)
@@ -527,10 +562,10 @@ class MainActivity : ComponentActivity() {
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }) {
-                                        Icon(Icons.Filled.Save, "Export")
+                                        Icon(Icons.Filled.Save, contentDescription = "Export")
                                     }
                                 }
-                            }
+                            )
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -545,6 +580,19 @@ class MainActivity : ComponentActivity() {
                                         Text("$size x $size")
                                     }
                                 }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Grid lines")
+                                Spacer(Modifier.width(12.dp))
+                                Switch(
+                                    checked = showGridLines,
+                                    onCheckedChange = { showGridLines = it }
+                                )
                             }
 
                             val onColorChange: (Int, Color) -> Unit = label@{ index, color ->
@@ -681,6 +729,7 @@ class MainActivity : ComponentActivity() {
                                     )
 
                                     if (showGridLines && gridSize % 2 == 0) {
+                                        val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                         Canvas(modifier = Modifier.fillMaxSize()) {
                                             val strokeWidth = 2.dp.toPx()
                                             val gridActualSize = size.width.coerceAtMost(size.height)
@@ -690,13 +739,13 @@ class MainActivity : ComponentActivity() {
                                             val gridRightX = gridLeftX + gridActualSize
 
                                             drawLine(
-                                                color = Color.Black.copy(alpha = 0.5f),
+                                                color = axisColor,
                                                 start = Offset(x = center.x, y = gridTopY),
                                                 end = Offset(x = center.x, y = gridBottomY),
                                                 strokeWidth = strokeWidth
                                             )
                                             drawLine(
-                                                color = Color.Black.copy(alpha = 0.5f),
+                                                color = axisColor,
                                                 start = Offset(x = gridLeftX, y = center.y),
                                                 end = Offset(x = gridRightX, y = center.y),
                                                 strokeWidth = strokeWidth
@@ -707,189 +756,178 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
-                            contentAlignment = Alignment.BottomStart
-                        ) {
-                            FloatingActionButton(onClick = { paletteVisible = !paletteVisible }) {
-                                Icon(Icons.Filled.ColorLens, "Colors")
-                            }
-                        }
-
                         AnimatedVisibility(
-                            visible = paletteVisible,
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)),
-                            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300))
+                            visible = toolMode == ToolMode.REPLACE,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 12.dp, vertical = 88.dp),
+                            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(250)),
+                            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250))
                         ) {
-                            Surface(modifier = Modifier.fillMaxHeight(0.5f), shadowElevation = 8.dp) {
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            if (toolMode == ToolMode.BRUSH) {
-                                                Button(
-                                                    onClick = {
-                                                        toolMode = ToolMode.BRUSH
-                                                        pickSourceArmed = false
-                                                    },
-                                                    modifier = Modifier.weight(1f)
-                                                ) { Text("Brush") }
-                                            } else {
-                                                OutlinedButton(
-                                                    onClick = {
-                                                        toolMode = ToolMode.BRUSH
-                                                        pickSourceArmed = false
-                                                    },
-                                                    modifier = Modifier.weight(1f)
-                                                ) { Text("Brush") }
-                                            }
-                                            if (toolMode == ToolMode.REPLACE) {
-                                                Button(
-                                                    onClick = { toolMode = ToolMode.REPLACE },
-                                                    modifier = Modifier.weight(1f)
-                                                ) { Text("Replace") }
-                                            } else {
-                                                OutlinedButton(
-                                                    onClick = { toolMode = ToolMode.REPLACE },
-                                                    modifier = Modifier.weight(1f)
-                                                ) { Text("Replace") }
-                                            }
-                                        }
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 8.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Button(
-                                                onClick = { pickSourceArmed = true },
-                                                enabled = toolMode == ToolMode.REPLACE,
-                                                modifier = Modifier.weight(1f)
-                                            ) { Text("Pick Source") }
-                                            Button(
-                                                onClick = { showReplaceConfirmDialog = true },
-                                                enabled = toolMode == ToolMode.REPLACE && replaceSourceColor != null,
-                                                modifier = Modifier.weight(1f)
-                                            ) { Text("Apply Replace") }
-                                        }
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 8.dp)
-                                        ) {
-                                            Text("Mirror")
-                                            val mirrorEnabled = toolMode == ToolMode.BRUSH
-                                            val mirrorOptions = listOf(
-                                                "Off" to SymmetryMode.NONE,
-                                                "Horizontal" to SymmetryMode.HORIZONTAL,
-                                                "Vertical" to SymmetryMode.VERTICAL,
-                                                "Both" to SymmetryMode.QUADRANT
-                                            )
-                                            LazyRow(
-                                                modifier = Modifier.padding(top = 8.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                items(mirrorOptions) { (label, mode) ->
-                                                    val selected = symmetryMode == mode
-                                                    if (selected) {
-                                                        Button(
-                                                            onClick = { symmetryMode = mode },
-                                                            enabled = mirrorEnabled
-                                                        ) { Text(label) }
-                                                    } else {
-                                                        OutlinedButton(
-                                                            onClick = { symmetryMode = mode },
-                                                            enabled = mirrorEnabled
-                                                        ) { Text(label) }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Grid lines")
-                                            Spacer(Modifier.width(12.dp))
-                                            Switch(
-                                                checked = showGridLines,
-                                                onCheckedChange = { showGridLines = it }
-                                            )
-                                        }
-                                        val statusText = if (toolMode == ToolMode.BRUSH) {
-                                            "Brush mode"
-                                        } else {
-                                            when {
-                                                pickSourceArmed -> "Replace: tap a cell to pick source"
-                                                replaceSourceColor == null -> "Replace: pick a source color"
-                                                else -> "Replace: source set, choose target and apply"
-                                            }
-                                        }
-                                        Text(
-                                            statusText,
-                                            modifier = Modifier.padding(top = 8.dp),
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                    TabRow(
-                                        selectedTabIndex = selectedPaletteTab,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        listOf("Pastel", "Metallic", "Bright", "Custom").forEachIndexed { index, label ->
-                                            Tab(
-                                                selected = selectedPaletteTab == index,
-                                                onClick = {
-                                                    val currentHex = paletteHexColors[selectedColorIndex]
-                                                    selectedPaletteTab = index
-                                                    val nextPalette = when (index) {
-                                                        0 -> pastelHexColors
-                                                        1 -> metallicHexColors
-                                                        2 -> brightHexColors
-                                                        else -> customHexColors
-                                                    }
-                                                    selectedColorIndex = selectIndexForPalette(currentHex, nextPalette)
-                                                },
-                                                text = { Text(label, maxLines = 1) },
-                                                modifier = Modifier.padding(vertical = 8.dp)
-                                            )
-                                        }
-                                    }
+                            val statusText = when {
+                                pickSourceArmed -> "Tap a cell to pick source"
+                                replaceSourceColor == null -> "Pick a source color"
+                                else -> "Source set, choose target and apply"
+                            }
+                            Surface(shadowElevation = 6.dp, tonalElevation = 3.dp) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(statusText, style = MaterialTheme.typography.bodySmall)
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("Palette", style = MaterialTheme.typography.titleMedium)
-                                        Button(onClick = {
-                                            hexInput = paletteHexColors[selectedColorIndex]
-                                            showEditHexDialog = true
-                                        }) { Text("Edit Hex") }
+                                        Button(onClick = { pickSourceArmed = true }) { Text("Pick Source") }
+                                        Button(
+                                            onClick = { showReplaceConfirmDialog = true },
+                                            enabled = replaceSourceColor != null
+                                        ) { Text("Apply Replace") }
                                     }
-                                    ColorPalette(
-                                        colorsHex = paletteHexColors,
-                                        selectedIndex = selectedColorIndex,
-                                        onColorSelected = { index ->
-                                            selectedColorIndex = index
-                                            paletteVisible = false
-                                        }
-                                    )
                                 }
                             }
                         }
 
-                        
+                        AnimatedVisibility(
+                            visible = showMirrorOptions && toolMode == ToolMode.BRUSH,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 12.dp, vertical = 88.dp),
+                            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(250)),
+                            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250))
+                        ) {
+                            val mirrorOptions = listOf(
+                                "Off" to SymmetryMode.NONE,
+                                "H" to SymmetryMode.HORIZONTAL,
+                                "V" to SymmetryMode.VERTICAL,
+                                "Both" to SymmetryMode.QUADRANT
+                            )
+                            Surface(shadowElevation = 6.dp, tonalElevation = 3.dp) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    mirrorOptions.forEach { (label, mode) ->
+                                        FilterChip(
+                                            selected = symmetryMode == mode,
+                                            onClick = { symmetryMode = mode },
+                                            label = { Text(label) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        NavigationBar(
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        ) {
+                            NavigationBarItem(
+                                selected = paletteVisible,
+                                onClick = {
+                                    paletteVisible = true
+                                    showMirrorOptions = false
+                                },
+                                icon = { Icon(Icons.Filled.ColorLens, contentDescription = "Palette") },
+                                label = { Text("Palette") }
+                            )
+                            NavigationBarItem(
+                                selected = toolMode == ToolMode.REPLACE,
+                                onClick = {
+                                    if (toolMode == ToolMode.REPLACE) {
+                                        toolMode = ToolMode.BRUSH
+                                        pickSourceArmed = false
+                                    } else {
+                                        toolMode = ToolMode.REPLACE
+                                        showMirrorOptions = false
+                                    }
+                                },
+                                icon = { Icon(Icons.Filled.SwapHoriz, contentDescription = "Replace") },
+                                label = { Text("Replace") }
+                            )
+                            NavigationBarItem(
+                                selected = showMirrorOptions,
+                                onClick = {
+                                    if (toolMode == ToolMode.BRUSH) {
+                                        showMirrorOptions = !showMirrorOptions
+                                    }
+                                },
+                                enabled = toolMode == ToolMode.BRUSH,
+                                icon = { Icon(Icons.Filled.Flip, contentDescription = "Mirror") },
+                                label = { Text("Mirror") }
+                            )
+                        }
+                    }
+                }
+
+                if (paletteVisible) {
+                    ModalBottomSheet(onDismissRequest = { paletteVisible = false }) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Palette", style = MaterialTheme.typography.titleMedium)
+                                IconButton(onClick = { paletteVisible = false }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Close Palette")
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                val paletteLabels = listOf("Pastel", "Metallic", "Bright", "Custom")
+                                LazyRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    items(paletteLabels.size) { index ->
+                                        FilterChip(
+                                            selected = selectedPaletteTab == index,
+                                            onClick = {
+                                                val currentHex = paletteHexColors[selectedColorIndex]
+                                                selectedPaletteTab = index
+                                                val nextPalette = when (index) {
+                                                    0 -> pastelHexColors
+                                                    1 -> metallicHexColors
+                                                    2 -> brightHexColors
+                                                    else -> customHexColors
+                                                }
+                                                selectedColorIndex = selectIndexForPalette(currentHex, nextPalette)
+                                            },
+                                            label = {
+                                                Text(
+                                                    paletteLabels[index],
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(onClick = {
+                                        hexInput = paletteHexColors[selectedColorIndex]
+                                        showEditHexDialog = true
+                                    }) { Text("Edit Hex") }
+                                }
+
+                                ColorPalette(
+                                    colorsHex = paletteHexColors,
+                                    selectedIndex = selectedColorIndex,
+                                    onColorSelected = { index ->
+                                        selectedColorIndex = index
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

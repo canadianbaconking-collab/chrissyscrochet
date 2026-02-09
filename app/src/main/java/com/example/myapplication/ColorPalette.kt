@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -85,6 +86,8 @@ fun ColorPalette(
     selectedIndex: Int,
     onColorSelected: (Int) -> Unit
 ) {
+    val selectedBorder = MaterialTheme.colorScheme.primary
+    val unselectedBorder = MaterialTheme.colorScheme.outlineVariant
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -99,7 +102,7 @@ fun ColorPalette(
                     .background(color)
                     .border(
                         width = if (index == selectedIndex) 4.dp else 2.dp,
-                        color = if (index == selectedIndex) Color.Cyan else Color.Gray
+                        color = if (index == selectedIndex) selectedBorder else unselectedBorder
                     )
                     .clickable { onColorSelected(index) }
             )
