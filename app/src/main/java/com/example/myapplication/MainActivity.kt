@@ -76,6 +76,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,7 +118,7 @@ class MainActivity : ComponentActivity() {
                 var pastelHexColors by remember { mutableStateOf(pastelPaletteHexes) }
                 var metallicHexColors by remember { mutableStateOf(metallicPaletteHexes) }
                 var brightHexColors by remember { mutableStateOf(brightPaletteHexes) }
-                var customHexColors by remember { mutableStateOf(listOf(brightPaletteHexes.first())) }
+                var customHexColors by remember { mutableStateOf(customPaletteHexes) }
                 var selectedPaletteTab by remember { mutableIntStateOf(0) }
                 var selectedColorIndex by remember { mutableIntStateOf(0) }
                 val paletteHexColors = when (selectedPaletteTab) {
@@ -692,6 +693,15 @@ class MainActivity : ComponentActivity() {
                                 }
                                 updatePattern(newPattern)
                             }
+                            val latestPattern by rememberUpdatedState(pattern)
+                            val latestToolMode by rememberUpdatedState(toolMode)
+                            val latestSelectedColor by rememberUpdatedState(selectedColor)
+                            val latestPickSourceArmed by rememberUpdatedState(pickSourceArmed)
+                            val latestGridSize by rememberUpdatedState(gridSize)
+                            val latestScale by rememberUpdatedState(scale)
+                            val latestOffset by rememberUpdatedState(offset)
+                            val latestLayoutSize by rememberUpdatedState(layoutSize)
+                            val latestOnColorChange by rememberUpdatedState(onColorChange)
 
                             Box(
                                 modifier = Modifier
@@ -710,26 +720,34 @@ class MainActivity : ComponentActivity() {
                                                 offset += pan
                                             }
                                         }
-                                        .pointerInput(Unit) {
+                                        .pointerInput(gridSize) {
                                             var lastIndex: Int? = null
                                             detectDragGestures(
                                                 onDragEnd = { lastIndex = null },
                                                 onDragCancel = { lastIndex = null }
                                             ) { change, _ ->
                                                 val position = change.position
-                                                val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
+                                                val currentLayoutSize = latestLayoutSize
+                                                val currentGridSize = latestGridSize
+                                                if (currentLayoutSize.width <= 0 || currentLayoutSize.height <= 0) {
+                                                    change.consume()
+                                                    return@detectDragGestures
+                                                }
+                                                val gridLayoutSize = currentLayoutSize.width.coerceAtMost(currentLayoutSize.height).toFloat()
+                                                val currentScale = latestScale
+                                                val currentOffset = latestOffset
 
-                                                val transformedX = (position.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
-                                                val transformedY = (position.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
+                                                val transformedX = (position.x - currentOffset.x - (currentLayoutSize.width - gridLayoutSize * currentScale) / 2f) / currentScale
+                                                val transformedY = (position.y - currentOffset.y - (currentLayoutSize.height - gridLayoutSize * currentScale) / 2f) / currentScale
 
-                                                val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
-                                                val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
+                                                val col = (transformedX / (gridLayoutSize / currentGridSize)).toInt()
+                                                val row = (transformedY / (gridLayoutSize / currentGridSize)).toInt()
 
-                                                if (col in 0 until gridSize && row in 0 until gridSize) {
-                                                    val index = row * gridSize + col
-                                                    if (index in pattern.indices && index != lastIndex) {
-                                                        if (toolMode == ToolMode.BRUSH) {
-                                                            onColorChange(index, selectedColor)
+                                                if (col in 0 until currentGridSize && row in 0 until currentGridSize) {
+                                                    val index = row * currentGridSize + col
+                                                    if (index in latestPattern.indices && index != lastIndex) {
+                                                        if (latestToolMode == ToolMode.BRUSH) {
+                                                            latestOnColorChange(index, latestSelectedColor)
                                                             lastIndex = index
                                                         }
                                                     }
@@ -737,23 +755,30 @@ class MainActivity : ComponentActivity() {
                                                 change.consume()
                                             }
                                         }
-                                        .pointerInput(Unit) {
+                                        .pointerInput(gridSize) {
                                             detectTapGestures { tapOffset ->
-                                                val gridLayoutSize = layoutSize.width.coerceAtMost(layoutSize.height).toFloat()
+                                                val currentLayoutSize = latestLayoutSize
+                                                val currentGridSize = latestGridSize
+                                                if (currentLayoutSize.width <= 0 || currentLayoutSize.height <= 0) {
+                                                    return@detectTapGestures
+                                                }
+                                                val gridLayoutSize = currentLayoutSize.width.coerceAtMost(currentLayoutSize.height).toFloat()
+                                                val currentScale = latestScale
+                                                val currentOffset = latestOffset
 
-                                                val transformedX = (tapOffset.x - offset.x - (layoutSize.width - gridLayoutSize * scale) / 2f) / scale
-                                                val transformedY = (tapOffset.y - offset.y - (layoutSize.height - gridLayoutSize * scale) / 2f) / scale
+                                                val transformedX = (tapOffset.x - currentOffset.x - (currentLayoutSize.width - gridLayoutSize * currentScale) / 2f) / currentScale
+                                                val transformedY = (tapOffset.y - currentOffset.y - (currentLayoutSize.height - gridLayoutSize * currentScale) / 2f) / currentScale
 
-                                                val col = (transformedX / (gridLayoutSize / gridSize)).toInt()
-                                                val row = (transformedY / (gridLayoutSize / gridSize)).toInt()
+                                                val col = (transformedX / (gridLayoutSize / currentGridSize)).toInt()
+                                                val row = (transformedY / (gridLayoutSize / currentGridSize)).toInt()
 
-                                                if (col in 0 until gridSize && row in 0 until gridSize) {
-                                                    val index = row * gridSize + col
-                                                    if (index in pattern.indices) {
-                                                        if (toolMode == ToolMode.BRUSH) {
-                                                            onColorChange(index, selectedColor)
-                                                        } else if (toolMode == ToolMode.REPLACE && pickSourceArmed) {
-                                                            replaceSourceColor = pattern[index]
+                                                if (col in 0 until currentGridSize && row in 0 until currentGridSize) {
+                                                    val index = row * currentGridSize + col
+                                                    if (index in latestPattern.indices) {
+                                                        if (latestToolMode == ToolMode.BRUSH) {
+                                                            latestOnColorChange(index, latestSelectedColor)
+                                                        } else if (latestToolMode == ToolMode.REPLACE && latestPickSourceArmed) {
+                                                            replaceSourceColor = latestPattern[index]
                                                             pickSourceArmed = false
                                                         }
                                                     }
@@ -775,33 +800,31 @@ class MainActivity : ComponentActivity() {
                                         selectedColor = selectedColor
                                     )
 
-                                    if (gridSize % 2 == 0) {
-                                        val axisColor = if (isDarkTheme) {
-                                            Color.White.copy(alpha = 0.9f)
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                        }
-                                        Canvas(modifier = Modifier.fillMaxSize()) {
-                                            val strokeWidth = 2.dp.toPx()
-                                            val gridActualSize = size.width.coerceAtMost(size.height)
-                                            val gridTopY = (size.height - gridActualSize) / 2f
-                                            val gridBottomY = gridTopY + gridActualSize
-                                            val gridLeftX = (size.width - gridActualSize) / 2f
-                                            val gridRightX = gridLeftX + gridActualSize
+                                    val axisColor = if (isDarkTheme) {
+                                        Color.White.copy(alpha = 0.95f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    }
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val strokeWidth = 2.dp.toPx()
+                                        val gridActualSize = size.width.coerceAtMost(size.height)
+                                        val gridTopY = (size.height - gridActualSize) / 2f
+                                        val gridBottomY = gridTopY + gridActualSize
+                                        val gridLeftX = (size.width - gridActualSize) / 2f
+                                        val gridRightX = gridLeftX + gridActualSize
 
-                                            drawLine(
-                                                color = axisColor,
-                                                start = Offset(x = center.x, y = gridTopY),
-                                                end = Offset(x = center.x, y = gridBottomY),
-                                                strokeWidth = strokeWidth
-                                            )
-                                            drawLine(
-                                                color = axisColor,
-                                                start = Offset(x = gridLeftX, y = center.y),
-                                                end = Offset(x = gridRightX, y = center.y),
-                                                strokeWidth = strokeWidth
-                                            )
-                                        }
+                                        drawLine(
+                                            color = axisColor,
+                                            start = Offset(x = center.x, y = gridTopY),
+                                            end = Offset(x = center.x, y = gridBottomY),
+                                            strokeWidth = strokeWidth
+                                        )
+                                        drawLine(
+                                            color = axisColor,
+                                            start = Offset(x = gridLeftX, y = center.y),
+                                            end = Offset(x = gridRightX, y = center.y),
+                                            strokeWidth = strokeWidth
+                                        )
                                     }
                                 }
                             }

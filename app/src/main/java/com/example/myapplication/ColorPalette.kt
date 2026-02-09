@@ -5,11 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -80,6 +80,25 @@ val metallicPaletteHexes = listOf(
 
 val brightPaletteHexes = crochetColorHexes
 
+val customPaletteHexes = listOf(
+    "#F8BBD0", // Pink
+    "#FFCCBC", // Coral
+    "#FFE082", // Amber
+    "#FFF59D", // Soft Yellow
+    "#C8E6C9", // Soft Green
+    "#B2DFDB", // Teal Tint
+    "#B3E5FC", // Sky Blue
+    "#C5CAE9", // Indigo Tint
+    "#D1C4E9", // Lavender Gray
+    "#E1BEE7", // Orchid
+    "#F0F4C3", // Pale Lime
+    "#CFD8DC", // Blue Gray
+    "#FFFFFF", // White
+    "#B0BEC5", // Silver Gray
+    "#607D8B", // Slate
+    "#263238"  // Charcoal
+)
+
 @Composable
 fun ColorPalette(
     colorsHex: List<String>,
@@ -88,24 +107,29 @@ fun ColorPalette(
 ) {
     val selectedBorder = MaterialTheme.colorScheme.primary
     val unselectedBorder = MaterialTheme.colorScheme.outlineVariant
-    LazyRow(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        itemsIndexed(colorsHex) { index, colorHex ->
-            val color = hexToColor(colorHex)
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(color)
-                    .border(
-                        width = if (index == selectedIndex) 4.dp else 2.dp,
-                        color = if (index == selectedIndex) selectedBorder else unselectedBorder
+        colorsHex.chunked(4).forEachIndexed { rowIndex, rowColors ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowColors.forEachIndexed { colIndex, colorHex ->
+                    val index = rowIndex * 4 + colIndex
+                    val color = hexToColor(colorHex)
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(color)
+                            .border(
+                                width = if (index == selectedIndex) 4.dp else 2.dp,
+                                color = if (index == selectedIndex) selectedBorder else unselectedBorder
+                            )
+                            .clickable { onColorSelected(index) }
                     )
-                    .clickable { onColorSelected(index) }
-            )
+                }
+            }
         }
     }
 }

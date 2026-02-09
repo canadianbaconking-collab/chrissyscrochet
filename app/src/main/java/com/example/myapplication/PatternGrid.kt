@@ -23,8 +23,8 @@ fun PatternGrid(
     selectedColor: Color
 ) {
     val isDarkTheme = isSystemInDarkTheme()
-    val gridLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.22f)
-    val centerLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.75f)
+    val gridLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.78f) else Color.Black.copy(alpha = 0.5f)
+    val centerLineColor = if (isDarkTheme) Color.White else Color.Black.copy(alpha = 0.85f)
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
@@ -44,7 +44,7 @@ fun PatternGrid(
                     .aspectRatio(1f)
                     .background(color)
                     .border(
-                        width = if (isCenterCell) 1.5.dp else 0.5.dp,
+                        width = if (isCenterCell) 1.5.dp else 1.dp,
                         color = if (isCenterCell) centerLineColor else gridLineColor
                     )
                     .clickable {
