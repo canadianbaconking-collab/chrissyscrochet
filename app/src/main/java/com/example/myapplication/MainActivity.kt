@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.content.Context.MODE_PRIVATE
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -136,6 +137,7 @@ class MainActivity : ComponentActivity() {
                 var showSaveDialog by remember { mutableStateOf(false) }
                 var showLoadDialog by remember { mutableStateOf(false) }
                 var showEditHexDialog by remember { mutableStateOf(false) }
+                var showRenameTabsDialog by remember { mutableStateOf(false) }
                 var hexInput by remember { mutableStateOf("") }
                 var showLoadConfirmDialog by remember { mutableStateOf(false) }
                 var pendingLoadName by remember { mutableStateOf<String?>(null) }
@@ -155,6 +157,13 @@ class MainActivity : ComponentActivity() {
                 var showMirrorOptions by remember { mutableStateOf(false) }
                 var showComposeSplashOverlay by remember { mutableStateOf(true) }
                 val isDarkTheme = isSystemInDarkTheme()
+                val paletteTabNamePrefs = remember(context) {
+                    context.getSharedPreferences("palette_tab_names", MODE_PRIVATE)
+                }
+                var paletteLabels by remember {
+                    mutableStateOf(loadPaletteTabNames(paletteTabNamePrefs))
+                }
+                var renameTabInputs by remember { mutableStateOf(paletteLabels) }
 
                 LaunchedEffect(Unit) {
                     delay(700)
@@ -369,6 +378,50 @@ class MainActivity : ComponentActivity() {
                         },
                         dismissButton = {
                             Button(onClick = { showEditHexDialog = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (showRenameTabsDialog) {
+                    val sanitizedNames = renameTabInputs.map { sanitizePaletteTabName(it) }
+                    val canSave = sanitizedNames.all { it != null }
+                    AlertDialog(
+                        onDismissRequest = { showRenameTabsDialog = false },
+                        title = { Text("Rename palette tabs") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                renameTabInputs.forEachIndexed { index, label ->
+                                    val isFieldValid = sanitizePaletteTabName(label) != null
+                                    TextField(
+                                        value = label,
+                                        onValueChange = { updatedValue ->
+                                            val updated = renameTabInputs.toMutableList()
+                                            updated[index] = updatedValue.take(14)
+                                            renameTabInputs = updated
+                                        },
+                                        label = { Text("Tab ${index + 1}") },
+                                        singleLine = true,
+                                        isError = !isFieldValid
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val namesToSave = sanitizedNames.mapNotNull { it }
+                                    if (namesToSave.size == defaultPaletteTabNames.size) {
+                                        val savedNames = savePaletteTabNames(paletteTabNamePrefs, namesToSave)
+                                        paletteLabels = savedNames
+                                        renameTabInputs = savedNames
+                                        showRenameTabsDialog = false
+                                    }
+                                },
+                                enabled = canSave
+                            ) { Text("Save") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showRenameTabsDialog = false }) { Text("Cancel") }
                         }
                     )
                 }
@@ -891,8 +944,19 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Palette", style = MaterialTheme.typography.titleMedium)
-                                IconButton(onClick = { paletteVisible = false }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Close Palette")
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(onClick = {
+                                        renameTabInputs = paletteLabels
+                                        showRenameTabsDialog = true
+                                    }) {
+                                        Text("Rename tabs")
+                                    }
+                                    IconButton(onClick = { paletteVisible = false }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Close Palette")
+                                    }
                                 }
                             }
 
@@ -902,7 +966,6 @@ class MainActivity : ComponentActivity() {
                                     .weight(1f)
                                     .verticalScroll(rememberScrollState())
                             ) {
-                                val paletteLabels = listOf("Pastel", "Metallic", "Bright", "Custom")
                                 LazyRow(
                                     modifier = Modifier
                                         .fillMaxWidth()
