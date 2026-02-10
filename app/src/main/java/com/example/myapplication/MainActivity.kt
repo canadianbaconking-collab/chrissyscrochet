@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -97,6 +96,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.example.myapplication.ui.UiColors
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import java.io.File
 import java.text.SimpleDateFormat
@@ -162,7 +162,6 @@ class MainActivity : ComponentActivity() {
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
                 var showMirrorOptions by remember { mutableStateOf(false) }
                 var showComposeSplashOverlay by remember { mutableStateOf(true) }
-                val isDarkTheme = isSystemInDarkTheme()
                 val paletteTabNamePrefs = remember(context) {
                     context.getSharedPreferences("palette_tab_names", MODE_PRIVATE)
                 }
@@ -651,8 +650,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Scaffold { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = UiColors.AppBg
+                ) {
+                    Scaffold(
+                        containerColor = UiColors.AppBg,
+                        contentColor = UiColors.TextPrimary
+                    ) { innerPadding ->
+                        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             TopAppBar(
                                 title = {},
@@ -793,7 +799,7 @@ class MainActivity : ComponentActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(if (isDarkTheme) Color.Black else MaterialTheme.colorScheme.surface)
+                                        .background(UiColors.SurfaceBg)
                                         .clip(RectangleShape)
                                         .onSizeChanged { layoutSize = it }
                                         .pointerInput(Unit) {
@@ -882,11 +888,7 @@ class MainActivity : ComponentActivity() {
                                         selectedColor = selectedColor
                                     )
 
-                                    val axisColor = if (isDarkTheme) {
-                                        Color.White.copy(alpha = 0.95f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    }
+                                    val axisColor = UiColors.Crosshair
                                     Canvas(modifier = Modifier.fillMaxSize()) {
                                         val strokeWidth = 2.dp.toPx()
                                         val gridActualSize = size.width.coerceAtMost(size.height)
@@ -1020,7 +1022,7 @@ class MainActivity : ComponentActivity() {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.White),
+                                    .background(UiColors.AppBg),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Image(
@@ -1034,8 +1036,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (paletteVisible) {
-                    ModalBottomSheet(onDismissRequest = { paletteVisible = false }) {
+                    if (paletteVisible) {
+                        ModalBottomSheet(onDismissRequest = { paletteVisible = false }) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1125,6 +1127,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
+                        }
                         }
                     }
                 }

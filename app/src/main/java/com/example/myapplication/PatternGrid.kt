@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.myapplication.ui.UiColors
 
 @Composable
 fun PatternGrid(
@@ -22,9 +22,8 @@ fun PatternGrid(
     onColorChange: (Int, Color) -> Unit,
     selectedColor: Color
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
-    val gridLineColor = if (isDarkTheme) Color.White.copy(alpha = 0.78f) else Color.Black.copy(alpha = 0.5f)
-    val centerLineColor = if (isDarkTheme) Color.White else Color.Black.copy(alpha = 0.85f)
+    val gridLineColor = UiColors.GridLine
+    val centerLineColor = UiColors.Crosshair
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
