@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 private const val PALETTE_TAB_PREF_MAX_LENGTH = 14
 private const val PALETTE_TAB_NAME_KEY_PREFIX = "palette_tab_name_"
 
-val defaultPaletteTabNames = defaultPaletteTabs.map { it.name }
+val defaultPaletteTabNames = listOf("Pastel", "Metallic", "Bright", "Custom")
 
 fun paletteTabNameKey(index: Int): String = "$PALETTE_TAB_NAME_KEY_PREFIX$index"
 

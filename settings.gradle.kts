@@ -21,6 +21,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "My Application"
 include(":app")
-include(":app_clean_canvas")
-include(":app_clean_layout")
+include(":app_old")
+
  

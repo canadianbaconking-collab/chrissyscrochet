@@ -53,7 +53,6 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -62,7 +61,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -70,7 +68,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +85,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -121,14 +119,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                var paletteTabs by remember { mutableStateOf(defaultPaletteTabs.map { it.colors }) }
+                var pastelHexColors by remember { mutableStateOf(pastelPaletteHexes) }
+                var metallicHexColors by remember { mutableStateOf(metallicPaletteHexes) }
+                var brightHexColors by remember { mutableStateOf(brightPaletteHexes) }
+                var customHexColors by remember { mutableStateOf(customPaletteHexes) }
                 var selectedPaletteTab by remember { mutableIntStateOf(0) }
                 var selectedColorIndex by remember { mutableIntStateOf(0) }
-                val paletteHexColors = paletteTabs.getOrElse(selectedPaletteTab) { paletteTabs.first() }
+                val paletteHexColors = when (selectedPaletteTab) {
+                    0 -> pastelHexColors
+                    1 -> metallicHexColors
+                    2 -> brightHexColors
+                    else -> customHexColors
+                }
                 val selectedColor = hexToColor(paletteHexColors[selectedColorIndex])
                 var gridSize by remember { mutableIntStateOf(36) }
 
-                var history by remember { mutableStateOf(listOf(List(gridSize * gridSize) { UiColors.GridBg })) }
+                var history by remember { mutableStateOf(listOf(List(gridSize * gridSize) { Color.White })) }
                 var historyIndex by remember { mutableIntStateOf(0) }
                 val pattern by remember { derivedStateOf { history[historyIndex] } }
 
@@ -151,16 +157,12 @@ class MainActivity : ComponentActivity() {
                 var filename by remember { mutableStateOf("") }
                 var savedPatternsVersion by remember { mutableIntStateOf(0) }
                 val context = LocalContext.current
-                val dialogContainerColor = UiColors.SurfaceBg
-                val dialogTitleColor = UiColors.TextPrimary
-                val dialogTextColor = UiColors.TextPrimary
 
                 var scale by remember { mutableStateOf(1f) }
                 var offset by remember { mutableStateOf(Offset.Zero) }
                 var layoutSize by remember { mutableStateOf(IntSize.Zero) }
                 var symmetryMode by remember { mutableStateOf(SymmetryMode.NONE) }
                 var showMirrorOptions by remember { mutableStateOf(false) }
-                var showCrosshairGuides by remember { mutableStateOf(true) }
                 var showComposeSplashOverlay by remember { mutableStateOf(true) }
                 val paletteTabNamePrefs = remember(context) {
                     context.getSharedPreferences("palette_tab_names", MODE_PRIVATE)
@@ -192,11 +194,6 @@ class MainActivity : ComponentActivity() {
                     pendingMismatch = null
                 }
 
-                fun clearReplaceState() {
-                    replaceSourceColor = null
-                    pickSourceArmed = false
-                }
-
                 fun updatePattern(newPattern: List<Color>, reset: Boolean = false) {
                     val newHistory = if (reset) {
                         mutableListOf(newPattern)
@@ -218,16 +215,14 @@ class MainActivity : ComponentActivity() {
                 }
                 
                 fun changeGridSize(newSize: Int) {
-                    clearReplaceState()
                     gridSize = newSize
-                    updatePattern(List(newSize * newSize) { UiColors.GridBg }, reset = true)
+                    updatePattern(List(newSize * newSize) { Color.White }, reset = true)
                     scale = 1f
                     offset = Offset.Zero
                 }
 
                 fun startNewPattern() {
-                    clearReplaceState()
-                    updatePattern(List(gridSize * gridSize) { UiColors.GridBg }, reset = true)
+                    updatePattern(List(gridSize * gridSize) { Color.White }, reset = true)
                     scale = 1f
                     offset = Offset.Zero
                     filename = ""
@@ -272,25 +267,18 @@ class MainActivity : ComponentActivity() {
                 }
 
                 fun loadPatternByName(name: String) {
-                    clearReplaceState()
                     pendingMismatch = null
-                    val result = loadRawPatternResult(context, name)
-                    val raw = when (result) {
-                        is LoadRawPatternResult.Success -> result.raw
-                        is LoadRawPatternResult.Error -> {
-                            Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
-                            showLoadConfirmDialog = false
-                            showLoadDialog = false
-                            clearPendingLoadState()
-                            return
-                        }
+                    val raw = loadRawPattern(context, name)
+                    if (raw == null) {
+                        Toast.makeText(context, "Failed to load pattern", Toast.LENGTH_SHORT).show()
+                        clearPendingLoadState()
+                        return
                     }
 
                     if (raw.size == gridSize) {
-                        updatePattern(raw.colors, reset = true)
+                        updatePattern(raw.colors)
                         Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
                         filename = name
-                        showLoadDialog = false
                         clearPendingLoadState()
                         return
                     }
@@ -300,14 +288,11 @@ class MainActivity : ComponentActivity() {
 
                 if (showLoadConfirmDialog) {
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = {
                             showLoadConfirmDialog = false
                             clearPendingLoadState()
                         },
-                        title = { Text("Load Pattern") },
+                        title = { Text("Load Pattern?") },
                         text = { Text("Loading will replace the current pattern.") },
                         confirmButton = {
                             Button(onClick = {
@@ -317,7 +302,7 @@ class MainActivity : ComponentActivity() {
                                 if (name != null) {
                                     loadPatternByName(name)
                                 }
-                            }) { Text("OK") }
+                            }) { Text("Confirm") }
                         },
                         dismissButton = {
                             Button(onClick = {
@@ -331,33 +316,27 @@ class MainActivity : ComponentActivity() {
                 if (pendingMismatch != null) {
                     val mismatch = pendingMismatch!!
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = {
-                            clearReplaceState()
                             clearPendingLoadState()
                         },
-                        title = { Text("Pattern Size Mismatch") },
+                        title = { Text("Pattern size mismatch") },
                         text = {
-                            Text("Loaded ${mismatch.raw.size}x${mismatch.raw.size}. Current is ${mismatch.currentSize}x${mismatch.currentSize}.")
+                            Text("Loaded ${mismatch.raw.size}x${mismatch.raw.size}, current ${mismatch.currentSize}x${mismatch.currentSize}")
                         },
                         confirmButton = {
                             Button(onClick = {
                                 val raw = mismatch.raw
                                 val loadedName = pendingLoadName
                                 gridSize = raw.size
-                                updatePattern(raw.colors, reset = true)
+                                updatePattern(raw.colors)
                                 scale = 1f
                                 offset = Offset.Zero
                                 Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
                                 if (!loadedName.isNullOrBlank()) {
                                     filename = loadedName
                                 }
-                                showLoadDialog = false
-                                clearReplaceState()
                                 clearPendingLoadState()
-                            }) { Text("Switch Size") }
+                            }) { Text("Switch to ${mismatch.raw.size}x${mismatch.raw.size} and load") }
                         },
                         dismissButton = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -368,19 +347,14 @@ class MainActivity : ComponentActivity() {
                                         mismatch.currentSize,
                                         Color.White
                                     )
-                                    updatePattern(transformed, reset = true)
+                                    updatePattern(transformed)
                                     Toast.makeText(context, "Pattern loaded", Toast.LENGTH_SHORT).show()
                                     if (!loadedName.isNullOrBlank()) {
                                         filename = loadedName
                                     }
-                                    showLoadDialog = false
-                                    clearReplaceState()
                                     clearPendingLoadState()
-                                }) { Text("Center And Load") }
-                                TextButton(onClick = {
-                                    clearReplaceState()
-                                    clearPendingLoadState()
-                                }) { Text("Cancel") }
+                                }) { Text("Center on ${mismatch.currentSize}x${mismatch.currentSize}") }
+                                TextButton(onClick = { clearPendingLoadState() }) { Text("Cancel") }
                             }
                         }
                     )
@@ -389,15 +363,12 @@ class MainActivity : ComponentActivity() {
                 if (showDeletePatternDialog) {
                     val nameToDelete = pendingDeleteName
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = {
                             showDeletePatternDialog = false
                             pendingDeleteName = null
                         },
-                        title = { Text("Delete Pattern") },
-                        text = { Text("Delete this pattern?") },
+                        title = { Text("Delete pattern?") },
+                        text = { Text("Delete ${nameToDelete.orEmpty()}?") },
                         confirmButton = {
                             Button(
                                 onClick = {
@@ -425,9 +396,6 @@ class MainActivity : ComponentActivity() {
                     val normalizedHex = normalizeHexInput(hexInput)
                     val isValid = normalizedHex != null
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = { showEditHexDialog = false },
                         title = { Text("Edit Hex") },
                         text = {
@@ -454,18 +422,19 @@ class MainActivity : ComponentActivity() {
                                     if (newHex != null) {
                                         val updated = paletteHexColors.toMutableList()
                                         updated[selectedColorIndex] = newHex
-                                        val nextTabs = paletteTabs.toMutableList()
-                                        nextTabs[selectedPaletteTab] = updated
-                                        paletteTabs = nextTabs
-                                        val shouldAddToCustom = if (selectedPaletteTab == CUSTOM_TAB_INDEX) {
+                                        when (selectedPaletteTab) {
+                                            0 -> pastelHexColors = updated
+                                            1 -> metallicHexColors = updated
+                                            2 -> brightHexColors = updated
+                                            else -> customHexColors = updated
+                                        }
+                                        val shouldAddToCustom = if (selectedPaletteTab == 3) {
                                             !updated.contains(newHex)
                                         } else {
-                                            !paletteTabs[CUSTOM_TAB_INDEX].contains(newHex)
+                                            !customHexColors.contains(newHex)
                                         }
                                         if (shouldAddToCustom) {
-                                            val appendedTabs = paletteTabs.toMutableList()
-                                            appendedTabs[CUSTOM_TAB_INDEX] = appendedTabs[CUSTOM_TAB_INDEX] + newHex
-                                            paletteTabs = appendedTabs
+                                            customHexColors = customHexColors + newHex
                                         }
                                         showEditHexDialog = false
                                     }
@@ -483,9 +452,6 @@ class MainActivity : ComponentActivity() {
                     val sanitizedNames = renameTabInputs.map { sanitizePaletteTabName(it) }
                     val canSave = sanitizedNames.all { it != null }
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = { showRenameTabsDialog = false },
                         title = { Text("Rename palette tabs") },
                         text = {
@@ -528,17 +494,14 @@ class MainActivity : ComponentActivity() {
 
                 if (showNewConfirmDialog) {
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = { showNewConfirmDialog = false },
-                        title = { Text("New Pattern") },
+                        title = { Text("New Pattern?") },
                         text = { Text("This will clear the current pattern.") },
                         confirmButton = {
                             Button(onClick = {
                                 showNewConfirmDialog = false
                                 startNewPattern()
-                            }) { Text("OK") }
+                            }) { Text("Confirm") }
                         },
                         dismissButton = {
                             Button(onClick = { showNewConfirmDialog = false }) { Text("Cancel") }
@@ -548,9 +511,6 @@ class MainActivity : ComponentActivity() {
 
                 if (showSaveDialog) {
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = { showSaveDialog = false },
                         title = { Text("Name Pattern") },
                         text = {
@@ -581,11 +541,8 @@ class MainActivity : ComponentActivity() {
 
                 if (showReplaceConfirmDialog) {
                     AlertDialog(
-                        containerColor = dialogContainerColor,
-                        titleContentColor = dialogTitleColor,
-                        textContentColor = dialogTextColor,
                         onDismissRequest = { showReplaceConfirmDialog = false },
-                        title = { Text("Apply Replace") },
+                        title = { Text("Apply Replace?") },
                         text = { Text("Replace all matching colors in the pattern?") },
                         confirmButton = {
                             Button(onClick = {
@@ -594,7 +551,7 @@ class MainActivity : ComponentActivity() {
                                 if (source != null) {
                                     applyReplace(source, selectedColor)
                                 }
-                            }) { Text("OK") }
+                            }) { Text("Confirm") }
                         },
                         dismissButton = {
                             Button(onClick = { showReplaceConfirmDialog = false }) { Text("Cancel") }
@@ -607,10 +564,7 @@ class MainActivity : ComponentActivity() {
                         getSavedPatterns(context)
                     }
                     Dialog(onDismissRequest = { showLoadDialog = false }) {
-                        Surface(
-                            modifier = Modifier.padding(16.dp),
-                            color = UiColors.SurfaceBg
-                        ) {
+                        Surface(modifier = Modifier.padding(16.dp)) {
                             Column {
                                 Text(
                                     "Saved Patterns",
@@ -632,7 +586,6 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         items(savedPatterns) { savedPattern ->
                                             Card(
-                                                colors = CardDefaults.cardColors(containerColor = UiColors.AppBg),
                                                 modifier = Modifier.clickable {
                                                     pendingLoadName = savedPattern.name
                                                     showLoadDialog = false
@@ -678,9 +631,7 @@ class MainActivity : ComponentActivity() {
                                                         )
                                                     } else {
                                                         Box(
-                                                            modifier = Modifier
-                                                                .size(128.dp)
-                                                                .background(UiColors.SurfaceBg),
+                                                            modifier = Modifier.size(128.dp),
                                                             contentAlignment = Alignment.Center
                                                         ) {
                                                             Text("No preview")
@@ -705,19 +656,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = UiColors.AppBg
                 ) {
-                    val topBarColors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = UiColors.SurfaceBg,
-                        titleContentColor = UiColors.TextPrimary,
-                        actionIconContentColor = UiColors.TextPrimary,
-                        navigationIconContentColor = UiColors.TextPrimary
-                    )
-                    val navItemColors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = UiColors.TextPrimary,
-                        selectedTextColor = UiColors.TextPrimary,
-                        unselectedIconColor = UiColors.TextPrimary.copy(alpha = 0.72f),
-                        unselectedTextColor = UiColors.TextPrimary.copy(alpha = 0.72f),
-                        indicatorColor = UiColors.AppBg
-                    )
                     Scaffold(
                         containerColor = UiColors.AppBg,
                         contentColor = UiColors.TextPrimary
@@ -736,7 +674,6 @@ class MainActivity : ComponentActivity() {
                         ) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             TopAppBar(
-                                colors = topBarColors,
                                 title = {},
                                 actions = {
                                     IconButton(onClick = { showNewConfirmDialog = true }) {
@@ -761,7 +698,6 @@ class MainActivity : ComponentActivity() {
                                     IconButton(
                                         onClick = {
                                             if (historyIndex > 0) {
-                                                clearReplaceState()
                                                 historyIndex--
                                                 val newSize = deriveGridSizeFromPattern(history[historyIndex])
                                                 if (newSize != gridSize) {
@@ -778,7 +714,6 @@ class MainActivity : ComponentActivity() {
                                     IconButton(
                                         onClick = {
                                             if (historyIndex < history.lastIndex) {
-                                                clearReplaceState()
                                                 historyIndex++
                                                 val newSize = deriveGridSizeFromPattern(history[historyIndex])
                                                 if (newSize != gridSize) {
@@ -796,10 +731,7 @@ class MainActivity : ComponentActivity() {
                             )
                             
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(UiColors.SurfaceBg)
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 val sizes = listOf(21, 25, 29, 36)
@@ -811,9 +743,6 @@ class MainActivity : ComponentActivity() {
                                         Text("$size x $size")
                                     }
                                 }
-                                TextButton(onClick = { showCrosshairGuides = !showCrosshairGuides }) {
-                                    Text(if (showCrosshairGuides) "Crosshair On" else "Crosshair Off")
-                                }
                             }
                             val onColorChange: (Int, Color) -> Unit = label@{ index, color ->
                                 if (toolMode == ToolMode.REPLACE) {
@@ -824,46 +753,45 @@ class MainActivity : ComponentActivity() {
                                     return@label
                                 }
                                 val newPattern = pattern.toMutableList()
-                                fun applyPaintWithSymmetry(target: MutableList<Color>, cellIndex: Int, paintColor: Color) {
-                                    val col = cellIndex % gridSize
-                                    val row = cellIndex / gridSize
-                                    target[cellIndex] = paintColor
-                                    val isOddGrid = gridSize % 2 != 0
-                                    val center = gridSize / 2
-                                    when (symmetryMode) {
-                                        SymmetryMode.VERTICAL -> {
-                                            val mirroredCol = gridSize - 1 - col
-                                            if (col != mirroredCol) {
-                                                target[row * gridSize + mirroredCol] = paintColor
-                                            }
+                                val col = index % gridSize
+                                val row = index / gridSize
+
+                                newPattern[index] = color
+                                
+                                val isOddGrid = gridSize % 2 != 0
+                                val center = gridSize / 2
+
+                                when (symmetryMode) {
+                                    SymmetryMode.VERTICAL -> {
+                                        val mirroredCol = gridSize - 1 - col
+                                        if (col != mirroredCol) {
+                                            newPattern[row * gridSize + mirroredCol] = color
                                         }
-                                        SymmetryMode.HORIZONTAL -> {
-                                            val mirroredRow = gridSize - 1 - row
-                                            if (row != mirroredRow) {
-                                                target[mirroredRow * gridSize + col] = paintColor
-                                            }
-                                        }
-                                        SymmetryMode.QUADRANT -> {
-                                            val mirroredCol = gridSize - 1 - col
-                                            val mirroredRow = gridSize - 1 - row
-                                            if (isOddGrid && (row == center || col == center)) {
-                                                if (row == center && col != center) {
-                                                    target[row * gridSize + mirroredCol] = paintColor
-                                                } else if (col == center && row != center) {
-                                                    target[mirroredRow * gridSize + col] = paintColor
-                                                }
-                                            } else {
-                                                if (col != mirroredCol) target[row * gridSize + mirroredCol] = paintColor
-                                                if (row != mirroredRow) target[mirroredRow * gridSize + col] = paintColor
-                                                if (col != mirroredCol && row != mirroredRow) {
-                                                    target[mirroredRow * gridSize + mirroredCol] = paintColor
-                                                }
-                                            }
-                                        }
-                                        SymmetryMode.NONE -> Unit
                                     }
+                                    SymmetryMode.HORIZONTAL -> {
+                                        val mirroredRow = gridSize - 1 - row
+                                        if (row != mirroredRow) {
+                                            newPattern[mirroredRow * gridSize + col] = color
+                                        }
+                                    }
+                                    SymmetryMode.QUADRANT -> {
+                                        val mirroredCol = gridSize - 1 - col
+                                        val mirroredRow = gridSize - 1 - row
+                                        
+                                        if (isOddGrid && (row == center || col == center)) {
+                                            if (row == center && col != center) {
+                                                newPattern[row * gridSize + mirroredCol] = color
+                                            } else if (col == center && row != center) {
+                                                 newPattern[mirroredRow * gridSize + col] = color
+                                            }
+                                        } else {
+                                            if (col != mirroredCol) newPattern[row * gridSize + mirroredCol] = color
+                                            if (row != mirroredRow) newPattern[mirroredRow * gridSize + col] = color
+                                            if (col != mirroredCol && row != mirroredRow) newPattern[mirroredRow * gridSize + mirroredCol] = color
+                                        }
+                                    }
+                                    SymmetryMode.NONE -> {}
                                 }
-                                applyPaintWithSymmetry(newPattern, index, color)
                                 updatePattern(newPattern)
                             }
                             val latestPattern by rememberUpdatedState(pattern)
@@ -871,7 +799,6 @@ class MainActivity : ComponentActivity() {
                             val latestSelectedColor by rememberUpdatedState(selectedColor)
                             val latestPickSourceArmed by rememberUpdatedState(pickSourceArmed)
                             val latestGridSize by rememberUpdatedState(gridSize)
-                            val latestSymmetryMode by rememberUpdatedState(symmetryMode)
                             val latestScale by rememberUpdatedState(scale)
                             val latestOffset by rememberUpdatedState(offset)
                             val latestLayoutSize by rememberUpdatedState(layoutSize)
@@ -903,74 +830,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                         .pointerInput(gridSize) {
                                             var lastIndex: Int? = null
-                                            var dragStartPattern: List<Color>? = null
-                                            val dragTouchedIndices = linkedSetOf<Int>()
                                             detectDragGestures(
-                                                onDragStart = {
-                                                    lastIndex = null
-                                                    dragStartPattern = latestPattern
-                                                    dragTouchedIndices.clear()
-                                                },
-                                                onDragEnd = {
-                                                    if (
-                                                        latestToolMode == ToolMode.BRUSH &&
-                                                        dragTouchedIndices.isNotEmpty() &&
-                                                        dragStartPattern != null
-                                                    ) {
-                                                        val base = dragStartPattern!!.toMutableList()
-                                                        val currentGridSize = latestGridSize
-                                                        val currentSymmetryMode = latestSymmetryMode
-                                                        val isOddGrid = currentGridSize % 2 != 0
-                                                        val center = currentGridSize / 2
-                                                        dragTouchedIndices.forEach { cellIndex ->
-                                                            if (cellIndex !in base.indices) return@forEach
-                                                            val col = cellIndex % currentGridSize
-                                                            val row = cellIndex / currentGridSize
-                                                            base[cellIndex] = latestSelectedColor
-                                                            when (currentSymmetryMode) {
-                                                                SymmetryMode.VERTICAL -> {
-                                                                    val mirroredCol = currentGridSize - 1 - col
-                                                                    if (col != mirroredCol) {
-                                                                        base[row * currentGridSize + mirroredCol] = latestSelectedColor
-                                                                    }
-                                                                }
-                                                                SymmetryMode.HORIZONTAL -> {
-                                                                    val mirroredRow = currentGridSize - 1 - row
-                                                                    if (row != mirroredRow) {
-                                                                        base[mirroredRow * currentGridSize + col] = latestSelectedColor
-                                                                    }
-                                                                }
-                                                                SymmetryMode.QUADRANT -> {
-                                                                    val mirroredCol = currentGridSize - 1 - col
-                                                                    val mirroredRow = currentGridSize - 1 - row
-                                                                    if (isOddGrid && (row == center || col == center)) {
-                                                                        if (row == center && col != center) {
-                                                                            base[row * currentGridSize + mirroredCol] = latestSelectedColor
-                                                                        } else if (col == center && row != center) {
-                                                                            base[mirroredRow * currentGridSize + col] = latestSelectedColor
-                                                                        }
-                                                                    } else {
-                                                                        if (col != mirroredCol) base[row * currentGridSize + mirroredCol] = latestSelectedColor
-                                                                        if (row != mirroredRow) base[mirroredRow * currentGridSize + col] = latestSelectedColor
-                                                                        if (col != mirroredCol && row != mirroredRow) {
-                                                                            base[mirroredRow * currentGridSize + mirroredCol] = latestSelectedColor
-                                                                        }
-                                                                    }
-                                                                }
-                                                                SymmetryMode.NONE -> Unit
-                                                            }
-                                                        }
-                                                        updatePattern(base)
-                                                    }
-                                                    lastIndex = null
-                                                    dragStartPattern = null
-                                                    dragTouchedIndices.clear()
-                                                },
-                                                onDragCancel = {
-                                                    lastIndex = null
-                                                    dragStartPattern = null
-                                                    dragTouchedIndices.clear()
-                                                }
+                                                onDragEnd = { lastIndex = null },
+                                                onDragCancel = { lastIndex = null }
                                             ) { change, _ ->
                                                 val position = change.position
                                                 val currentLayoutSize = latestLayoutSize
@@ -993,7 +855,7 @@ class MainActivity : ComponentActivity() {
                                                     val index = row * currentGridSize + col
                                                     if (index in latestPattern.indices && index != lastIndex) {
                                                         if (latestToolMode == ToolMode.BRUSH) {
-                                                            dragTouchedIndices.add(index)
+                                                            latestOnColorChange(index, latestSelectedColor)
                                                             lastIndex = index
                                                         }
                                                     }
@@ -1042,10 +904,42 @@ class MainActivity : ComponentActivity() {
                                         ),
                                         pattern = pattern,
                                         gridSize = gridSize,
-                                        showCrosshairGuides = showCrosshairGuides,
                                         onColorChange = onColorChange,
                                         selectedColor = selectedColor
                                     )
+
+                                    val axisColor = UiColors.Crosshair
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val strokeWidth = 2.dp.toPx()
+                                        val gridBaseSize = size.width.coerceAtMost(size.height)
+                                        val gridActualSize = gridBaseSize * scale
+                                        val gridLeftX = (size.width - gridActualSize) / 2f + offset.x
+                                        val gridTopY = (size.height - gridActualSize) / 2f + offset.y
+                                        val gridRightX = gridLeftX + gridActualSize
+                                        val gridBottomY = gridTopY + gridActualSize
+                                        val centerX = (gridLeftX + gridRightX) / 2f
+                                        val centerY = (gridTopY + gridBottomY) / 2f
+
+                                        clipRect(
+                                            left = gridLeftX,
+                                            top = gridTopY,
+                                            right = gridRightX,
+                                            bottom = gridBottomY
+                                        ) {
+                                            drawLine(
+                                                color = axisColor,
+                                                start = Offset(x = centerX, y = gridTopY),
+                                                end = Offset(x = centerX, y = gridBottomY),
+                                                strokeWidth = strokeWidth
+                                            )
+                                            drawLine(
+                                                color = axisColor,
+                                                start = Offset(x = gridLeftX, y = centerY),
+                                                end = Offset(x = gridRightX, y = centerY),
+                                                strokeWidth = strokeWidth
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1059,15 +953,11 @@ class MainActivity : ComponentActivity() {
                             exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250))
                         ) {
                             val statusText = when {
-                                pickSourceArmed -> "Tap a cell to pick source."
-                                replaceSourceColor == null -> "Pick a source color."
-                                else -> "Source set. Choose target and apply."
+                                pickSourceArmed -> "Tap a cell to pick source"
+                                replaceSourceColor == null -> "Pick a source color"
+                                else -> "Source set, choose target and apply"
                             }
-                            Surface(
-                                color = UiColors.SurfaceBg,
-                                shadowElevation = 6.dp,
-                                tonalElevation = 3.dp
-                            ) {
+                            Surface(shadowElevation = 6.dp, tonalElevation = 3.dp) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(statusText, style = MaterialTheme.typography.bodySmall)
                                     Row(
@@ -1098,11 +988,7 @@ class MainActivity : ComponentActivity() {
                                 "V" to SymmetryMode.VERTICAL,
                                 "Both" to SymmetryMode.QUADRANT
                             )
-                            Surface(
-                                color = UiColors.SurfaceBg,
-                                shadowElevation = 6.dp,
-                                tonalElevation = 3.dp
-                            ) {
+                            Surface(shadowElevation = 6.dp, tonalElevation = 3.dp) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1119,7 +1005,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         NavigationBar(
-                            containerColor = UiColors.SurfaceBg,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .then(
@@ -1131,7 +1016,6 @@ class MainActivity : ComponentActivity() {
                                 )
                         ) {
                             NavigationBarItem(
-                                colors = navItemColors,
                                 selected = paletteVisible,
                                 onClick = {
                                     paletteVisible = true
@@ -1141,12 +1025,11 @@ class MainActivity : ComponentActivity() {
                                 label = { Text("Palette") }
                             )
                             NavigationBarItem(
-                                colors = navItemColors,
                                 selected = toolMode == ToolMode.REPLACE,
                                 onClick = {
                                     if (toolMode == ToolMode.REPLACE) {
                                         toolMode = ToolMode.BRUSH
-                                        clearReplaceState()
+                                        pickSourceArmed = false
                                     } else {
                                         toolMode = ToolMode.REPLACE
                                         showMirrorOptions = false
@@ -1156,7 +1039,6 @@ class MainActivity : ComponentActivity() {
                                 label = { Text("Replace") }
                             )
                             NavigationBarItem(
-                                colors = navItemColors,
                                 selected = showMirrorOptions,
                                 onClick = {
                                     if (toolMode == ToolMode.BRUSH) {
@@ -1193,15 +1075,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                     if (paletteVisible) {
-                        ModalBottomSheet(
-                            onDismissRequest = { paletteVisible = false },
-                            containerColor = UiColors.SurfaceBg,
-                            scrimColor = Color.Black.copy(alpha = 0.65f)
-                        ) {
+                        ModalBottomSheet(onDismissRequest = { paletteVisible = false }) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(UiColors.SurfaceBg)
                                 .fillMaxHeight(0.9f)
                         ) {
                             Row(
@@ -1246,7 +1123,12 @@ class MainActivity : ComponentActivity() {
                                             onClick = {
                                                 val currentHex = paletteHexColors[selectedColorIndex]
                                                 selectedPaletteTab = index
-                                                val nextPalette = paletteTabs[index]
+                                                val nextPalette = when (index) {
+                                                    0 -> pastelHexColors
+                                                    1 -> metallicHexColors
+                                                    2 -> brightHexColors
+                                                    else -> customHexColors
+                                                }
                                                 selectedColorIndex = selectIndexForPalette(currentHex, nextPalette)
                                             },
                                             label = {

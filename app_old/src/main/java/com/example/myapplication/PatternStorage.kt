@@ -12,17 +12,12 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 data class SavedPattern(val name: String, val thumbnailUrl: String)
-data class RawPattern(val size: Int, val colors: List<Color>)
-
-sealed class LoadRawPatternResult {
-    data class Success(val raw: RawPattern) : LoadRawPatternResult()
-    data class Error(val message: String) : LoadRawPatternResult()
-}
 
 private fun createPatternBitmap(pattern: List<Color>, gridSize: Int, scale: Int = 1): Bitmap {
     val size = gridSize * scale
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
+
     pattern.forEachIndexed { index, color ->
         val x = (index % gridSize) * scale
         val y = (index / gridSize) * scale
@@ -34,7 +29,13 @@ private fun createPatternBitmap(pattern: List<Color>, gridSize: Int, scale: Int 
                 (color.blue * 255).toInt()
             )
         }
-        canvas.drawRect(x.toFloat(), y.toFloat(), (x + scale).toFloat(), (y + scale).toFloat(), paint)
+        canvas.drawRect(
+            x.toFloat(),
+            y.toFloat(),
+            (x + scale).toFloat(),
+            (y + scale).toFloat(),
+            paint
+        )
     }
     return bitmap
 }
@@ -53,6 +54,7 @@ fun nextAvailablePatternName(requestedName: String, existingNames: Set<String>):
     val trimmed = requestedName.trim()
     if (trimmed.isEmpty()) return requestedName
     if (!existingNames.contains(trimmed)) return trimmed
+
     var suffix = 1
     while (true) {
         val candidate = "$trimmed ($suffix)"
@@ -65,11 +67,13 @@ fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSi
     return try {
         val dir = File(context.filesDir, "patterns")
         if (!dir.exists()) dir.mkdirs()
+
         val existingNames = (dir.listFiles() ?: emptyArray())
             .filter { it.extension == "txt" }
             .map { it.nameWithoutExtension }
             .toSet()
         val actualName = nextAvailablePatternName(filename, existingNames)
+
         val file = File(dir, "$actualName.txt")
         file.writeText(pattern.joinToString(",") { colorToHex(it) })
 
@@ -86,60 +90,69 @@ fun savePattern(context: Context, filename: String, pattern: List<Color>, gridSi
     }
 }
 
+data class RawPattern(val size: Int, val colors: List<Color>)
+
 private fun deriveSquareSizeOrNull(count: Int): Int? {
     if (count <= 0) return null
     val root = kotlin.math.sqrt(count.toDouble()).toInt()
     return if (root * root == count) root else null
 }
 
-private fun parseHexStrict(value: String): Color? {
-    val normalized = normalizeHexInput(value) ?: return null
-    val hex = normalized.removePrefix("#")
-    val argb = if (hex.length == 6) "FF$hex" else hex
-    return runCatching { Color(argb.toLong(16)) }.getOrNull()
-}
-
-fun loadRawPatternResult(context: Context, filename: String): LoadRawPatternResult {
+/**
+ * Loads the pattern from disk and derives its grid size by sqrt(colorCount).
+ * Returns null if the file is missing/corrupt/non-square.
+ */
+fun loadRawPattern(context: Context, filename: String): RawPattern? {
     return try {
         val dir = File(context.filesDir, "patterns")
         val file = File(dir, "$filename.txt")
+        if (!file.exists()) return null
+
         val text = file.readText().trim()
-        if (text.isEmpty()) {
-            return LoadRawPatternResult.Error("Could not load pattern. Pattern is empty.")
-        }
-        val colors = text.split(",").map { token ->
-            parseHexStrict(token) ?: return LoadRawPatternResult.Error("Could not load pattern. Invalid color data.")
-        }
-        val size = deriveSquareSizeOrNull(colors.size)
-            ?: return LoadRawPatternResult.Error("Could not load pattern. Pattern is not square.")
-        LoadRawPatternResult.Success(RawPattern(size = size, colors = colors))
+        if (text.isEmpty()) return null
+
+        val colors: List<Color> = text.split(",").map { hexToColor(it) }
+        val size = deriveSquareSizeOrNull(colors.size) ?: return null
+
+        RawPattern(size = size, colors = colors)
     } catch (e: IOException) {
         e.printStackTrace()
-        LoadRawPatternResult.Error("Could not load pattern. Read failed.")
+        null
     } catch (e: Exception) {
+        // hex parse or other unexpected issues
         e.printStackTrace()
-        LoadRawPatternResult.Error("Could not load pattern. Read failed.")
+        null
     }
 }
 
-fun loadRawPattern(context: Context, filename: String): RawPattern? {
-    return when (val result = loadRawPatternResult(context, filename)) {
-        is LoadRawPatternResult.Success -> result.raw
-        is LoadRawPatternResult.Error -> null
-    }
-}
-
-fun transformPatternCenter(raw: RawPattern, dstSize: Int, padColor: Color = Color.White): List<Color> {
+/**
+ * Deterministic center transform:
+ * - If dstSize > srcSize: center-place src into dst, padColor elsewhere.
+ * - If dstSize < srcSize: crop centered dst window from src.
+ *
+ * Offset rule is FLOOR for odd differences (consistent + deterministic):
+ *   padOffset = (dst - src) / 2
+ *   cropStart = (src - dst) / 2
+ */
+fun transformPatternCenter(
+    raw: RawPattern,
+    dstSize: Int,
+    padColor: Color = Color.White
+): List<Color> {
     val srcSize = raw.size
     val src = raw.colors
+
     if (dstSize <= 0) return emptyList()
     if (srcSize <= 0) return emptyList()
     if (src.size != srcSize * srcSize) return emptyList()
+
+    // Identity
     if (srcSize == dstSize) return src
 
+    // Pad (dst bigger): place src centered into dst
     if (dstSize > srcSize) {
         val out = MutableList(dstSize * dstSize) { padColor }
-        val off = (dstSize - srcSize) / 2
+        val off = (dstSize - srcSize) / 2  // floor
         for (y in 0 until srcSize) {
             for (x in 0 until srcSize) {
                 val dstX = x + off
@@ -150,24 +163,29 @@ fun transformPatternCenter(raw: RawPattern, dstSize: Int, padColor: Color = Colo
         return out
     }
 
-    val out = MutableList(dstSize * dstSize) { padColor }
-    val start = (srcSize - dstSize) / 2
-    for (y in 0 until dstSize) {
-        for (x in 0 until dstSize) {
-            val srcX = x + start
-            val srcY = y + start
-            out[y * dstSize + x] = src[srcY * srcSize + srcX]
+    // Crop (dst smaller): take centered dst window from src
+    run {
+        val out = MutableList(dstSize * dstSize) { padColor }
+        val start = (srcSize - dstSize) / 2 // floor
+        for (y in 0 until dstSize) {
+            for (x in 0 until dstSize) {
+                val srcX = x + start
+                val srcY = y + start
+                out[y * dstSize + x] = src[srcY * srcSize + srcX]
+            }
         }
+        return out
     }
-    return out
 }
+
 
 fun loadPattern(context: Context, filename: String, gridSize: Int): List<Color> {
     return try {
         val dir = File(context.filesDir, "patterns")
         val file = File(dir, "$filename.txt")
         if (!file.exists()) return emptyList()
-        val colors = file.readText().split(",").map { hexToColor(it) }
+
+        val colors: List<Color> = file.readText().split(",").map { hexToColor(it) }
         if (colors.size == gridSize * gridSize) colors else emptyList()
     } catch (e: IOException) {
         e.printStackTrace()
@@ -178,8 +196,9 @@ fun loadPattern(context: Context, filename: String, gridSize: Int): List<Color> 
 fun getSavedPatterns(context: Context): List<SavedPattern> {
     val dir = File(context.filesDir, "patterns")
     if (!dir.exists()) return emptyList()
-    val files = dir.listFiles() ?: return emptyList()
-    return files.filter { it.extension == "txt" }.map { file ->
+
+    val files: Array<File> = dir.listFiles() ?: return emptyList()
+    return files.filter { it.extension == "txt" }.map { file: File ->
         val name = file.nameWithoutExtension
         val thumbnailPath = File(dir, "${name}_thumb.png").absolutePath
         SavedPattern(name, thumbnailPath)
@@ -189,6 +208,7 @@ fun getSavedPatterns(context: Context): List<SavedPattern> {
 fun deleteSavedPattern(context: Context, filename: String): Boolean {
     val dir = File(context.filesDir, "patterns")
     if (!dir.exists()) return false
+
     val patternFile = File(dir, "$filename.txt")
     val thumbFile = File(dir, "${filename}_thumb.png")
     val patternDeletedOrMissing = !patternFile.exists() || patternFile.delete()
@@ -196,60 +216,27 @@ fun deleteSavedPattern(context: Context, filename: String): Boolean {
     return patternDeletedOrMissing && thumbDeletedOrMissing
 }
 
-private fun exportNameExists(context: Context, baseName: String): Boolean {
-    val displayName = "$baseName.jpg"
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val projection = arrayOf(MediaStore.Images.Media._ID)
-        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} = ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
-        val args = arrayOf(displayName, "${Environment.DIRECTORY_PICTURES}%")
-        context.contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            args,
-            null
-        )?.use { cursor ->
-            return cursor.count > 0
-        }
-        return false
-    }
-
-    @Suppress("DEPRECATION")
-    val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-    return File(picturesDir, displayName).exists()
-}
-
-private fun nextAvailableExportName(context: Context, baseName: String): String {
-    val trimmed = baseName.trim().ifEmpty { "pattern" }
-    if (!exportNameExists(context, trimmed)) return trimmed
-    var suffix = 1
-    while (true) {
-        val candidate = "${trimmed}_$suffix"
-        if (!exportNameExists(context, candidate)) return candidate
-        suffix++
-    }
-}
-
 fun exportPatternToJpg(context: Context, filename: String, pattern: List<Color>, gridSize: Int): Boolean {
     return try {
-        val actualName = nextAvailableExportName(context, filename)
         val bitmap = createPatternBitmap(pattern, gridSize, scale = 10)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "$actualName.jpg")
+                put(MediaStore.Images.Media.DISPLAY_NAME, "$filename.jpg")
                 put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
             }
+
             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             uri?.let {
                 context.contentResolver.openOutputStream(it).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out!!)
                 }
-            } ?: return false
+            }
         } else {
             @Suppress("DEPRECATION")
             val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val file = File(picturesDir, "$actualName.jpg")
+            val file = File(picturesDir, "$filename.jpg")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
             }

@@ -34,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.myapplication.clean.canvas"
+        applicationId = "com.example.myapplication"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
