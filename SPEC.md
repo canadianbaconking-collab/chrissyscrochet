@@ -1,5 +1,9 @@
 # Chrissy's Crochet App Specification (Clean-Room Extraction)
 
+## Anchor Drift Note
+- Code anchors (file + line numbers) were verified as of `2026-02-10`.
+- Function/type names are canonical anchors if line numbers drift in future edits.
+
 ## 1) App Overview
 - The app is a square pixel-pattern editor for crochet planning with:
 - Paint/drag painting on a grid, optional symmetry mirroring, replace-by-color workflow, undo/redo history, save/load/delete/export, and palette editing.
@@ -28,7 +32,11 @@ Code references:
 ### 2.2 Palette Index vs Stored Color
 - Runtime selected paint color is derived from current tab's hex list and selected slot index (`selectedPaletteTab`, `selectedColorIndex`).
 - Pattern cells store actual color values, not palette slot indices.
-- Save format serializes each cell as ARGB hex (`#AARRGGBB`), comma-separated.
+- Color input normalization contract:
+- Accept `#RRGGBB` or `#AARRGGBB`.
+- On parse, normalize `#RRGGBB` to canonical `#FFRRGGBB`.
+- Persist/save/export using canonical `#AARRGGBB` tokens.
+- Save format serializes each cell as canonical ARGB hex (`#AARRGGBB`), comma-separated.
 
 Code references:
 - Palette selection state: `MainActivity` (`app/src/main/java/com/example/myapplication/MainActivity.kt:126`)
@@ -40,6 +48,18 @@ Code references:
 - Max history depth is 50 snapshots.
 - New edits truncate redo branch (`take(historyIndex + 1)`), append snapshot, then cap size.
 - Reset operations (new/load/size change) replace history with one snapshot.
+
+History truncation pseudocode:
+```text
+if reset:
+  history = [newPattern]
+  historyIndex = 0
+else:
+  branch = history.take(historyIndex + 1)
+  appended = branch + [newPattern]
+  history = appended.takeLast(50)
+  historyIndex = history.lastIndex
+```
 
 Code references:
 - `history`, `historyIndex`, `pattern`: (`app/src/main/java/com/example/myapplication/MainActivity.kt:137`)
@@ -98,6 +118,21 @@ Code references:
 - "Pick Source" arms source-pick mode; next tap picks source color.
 - "Apply Replace" asks confirmation, then replaces all exact matches of source with current selected target color.
 
+Replace state machine:
+
+| Current mode | Source state | Event | Next mode | Next source state |
+| --- | --- | --- | --- | --- |
+| Brush | None | Switch to Replace | Replace | Unarmed |
+| Replace | Unarmed | Pick Source | Replace | Armed |
+| Replace | Armed | Tap valid cell | Replace | Source selected |
+| Replace | Source selected | Apply Replace OK | Replace | Source selected |
+| Replace | Any | Switch away from Replace | Brush | Cleared |
+| Replace | Any | Undo | Replace | Cleared |
+| Replace | Any | Redo | Replace | Cleared |
+| Replace | Any | New pattern | Replace or Brush (unchanged mode choice) | Cleared |
+| Replace | Any | Load pattern (success, mismatch dialog path, or error path) | Replace or Brush (unchanged mode choice) | Cleared |
+| Replace | Any | Change grid size | Replace or Brush (unchanged mode choice) | Cleared |
+
 Code references:
 - Tool mode state and toggle: (`app/src/main/java/com/example/myapplication/MainActivity.kt:1027`)
 - Replace panel status/actions: (`app/src/main/java/com/example/myapplication/MainActivity.kt:947`)
@@ -107,7 +142,16 @@ Code references:
 - Available only in brush mode.
 - Modes:
 - `Off` (`NONE`), `H` (`HORIZONTAL`), `V` (`VERTICAL`), `Both` (`QUADRANT`).
-- Odd-grid centerline handling avoids duplicate writes on center row/column.
+- Odd-grid explicit rules for size `N` with `c = floor(N/2)`:
+- `HORIZONTAL`: if `row == c`, do not mirror; single write only.
+- `VERTICAL`: if `col == c`, do not mirror; single write only.
+- `QUADRANT`: if `row == c` or `col == c`, do not mirror across that centerline; write only unique cells (no duplicates).
+
+Concrete examples for `N=21` (`c=10`):
+- `VERTICAL`, paint `(row=4,col=3)` -> affected cells: `(4,3)`, `(4,17)`.
+- `VERTICAL`, paint `(row=4,col=10)` -> affected cells: `(4,10)` only.
+- `QUADRANT`, paint `(row=10,col=6)` -> affected cells: `(10,6)`, `(10,14)` only.
+- `QUADRANT`, paint `(row=3,col=5)` -> affected cells: `(3,5)`, `(3,15)`, `(17,5)`, `(17,15)`.
 
 Code references:
 - Mirror options UI: (`app/src/main/java/com/example/myapplication/MainActivity.kt:985`)
@@ -168,7 +212,8 @@ Code references:
 ### 4.9 Export JPG (Pattern-Only)
 - Exports current pattern bitmap scaled by `10x` cell size.
 - Exported content is only cell color blocks (no UI chrome, no gridline overlay).
-- Name uses current filename or timestamp fallback `pattern_yyyyMMdd_HHmmss`.
+- Name uses current filename or timestamp fallback `pattern_yyyyMMdd_HHmmss` (device local time, 24-hour).
+- Export collision handling: if target filename already exists, append `_1`, `_2`, etc.
 - Writes to Pictures via MediaStore on Android Q+, or direct Pictures file path on older versions.
 
 Code references:
@@ -195,6 +240,8 @@ Code references:
 - Save never overwrites an existing `name.txt`.
 - First collision becomes `name (1)`, then increments until unused.
 - Empty trimmed requested name is returned unchanged by helper; caller-side UI blocks blank save from dialog.
+- Export never overwrites an existing JPG.
+- First export collision becomes `name_1.jpg`, then increments to `name_2.jpg`, etc.
 
 Code references:
 - Collision algorithm: `nextAvailablePatternName` (`app/src/main/java/com/example/myapplication/PatternStorage.kt:53`)
@@ -208,6 +255,40 @@ Code references:
 - UI confirmation: (`app/src/main/java/com/example/myapplication/MainActivity.kt:363`)
 - Boolean deletion logic: (`app/src/main/java/com/example/myapplication/PatternStorage.kt:214`)
 
+### 5.4 Load Error Handling
+- Error conditions:
+- Corrupted/invalid hex tokens.
+- Non-square color count.
+- Empty pattern file.
+- Read/IO failure.
+- Required behavior on load error:
+- Show an error message (exact string may be TBD).
+- Close load flow dialogs.
+- Keep current pattern unchanged.
+- Keep history unchanged.
+- Keep current grid size unchanged.
+
+Code references:
+- Error/null return points from raw loader: (`app/src/main/java/com/example/myapplication/PatternStorage.kt:105`)
+- Caller-side load failure branch: (`app/src/main/java/com/example/myapplication/MainActivity.kt:271`)
+
+### 5.5 Undo/Redo Scope
+- Create history snapshots:
+- Brush paint tap.
+- Brush drag paint.
+- Mirror paint write (all affected cells recorded as one snapshot).
+- Replace operation (all affected cells recorded as one snapshot).
+- Reset history:
+- New pattern.
+- Load pattern.
+- Change grid size.
+- Not recorded in history:
+- Palette selection changes.
+- Tool mode changes.
+- Mirror mode toggles.
+- Palette tab switching/rename.
+- Edit hex in palette.
+
 ## 6) Storage Contracts (Human Summary)
 - Pattern files:
 - Directory: app internal `filesDir/patterns`.
@@ -217,8 +298,51 @@ Code references:
 - SharedPreferences file name: `palette_tab_names`.
 - Keys: `palette_tab_name_0` ... `palette_tab_name_3`.
 - Values sanitized as trimmed non-empty strings, max length 14.
+- Custom palette colors:
+- Runtime list exists and can be appended during Edit Hex flow.
+- Persistent storage for custom palette colors is not implemented in current code; see `contracts/custom_palette.schema.json` for future contract target.
+- Custom palette cap: uncapped in v1 (no explicit max size in spec).
 
 Code references:
 - Pattern storage pathing: (`app/src/main/java/com/example/myapplication/PatternStorage.kt:68`)
 - Palette pref file usage: (`app/src/main/java/com/example/myapplication/MainActivity.kt:167`)
 - Key generation and sanitize: (`app/src/main/java/com/example/myapplication/PaletteTabPrefs.kt:10`)
+
+## 7) UI String Appendix (Canonical Spec Text)
+
+### 7.1 Delete Pattern Confirmation
+- Title: `Delete Pattern`
+- Body: `Delete this pattern?`
+- Buttons: `Cancel` / `Delete`
+
+### 7.2 Load Pattern Confirmation
+- Title: `Load Pattern`
+- Body: `Loading will replace the current pattern.`
+- Buttons: `Cancel` / `OK`
+
+### 7.3 Size Mismatch Load Dialog
+- Title: `Pattern Size Mismatch`
+- Body: `Loaded {src}x{src}. Current is {dst}x{dst}.`
+- Buttons:
+- `Cancel`
+- `Switch Size` (switch editor size to loaded size and load)
+- `Center And Load` (center pad/crop onto current size)
+
+### 7.4 Replace Tool Text
+- Confirmation title: `Apply Replace`
+- Confirmation body: `Replace all matching colors in the pattern?`
+- Confirmation buttons: `Cancel` / `OK`
+- Status text (unarmed): `Pick a source color.`
+- Status text (armed): `Tap a cell to pick source.`
+- Status text (source selected): `Source set. Choose target and apply.`
+
+### 7.5 New Pattern Confirmation
+- Title: `New Pattern`
+- Body: `This will clear the current pattern.`
+- Buttons: `Cancel` / `OK`
+
+### 7.6 Load Error Messages
+- Corrupt/invalid hex: `Could not load pattern. Invalid color data.`
+- Non-square color count: `Could not load pattern. Pattern is not square.`
+- Empty file: `Could not load pattern. Pattern is empty.`
+- Read failure: `Could not load pattern. Read failed.`

@@ -85,6 +85,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -108,6 +109,7 @@ import kotlin.math.sqrt
 enum class SymmetryMode { NONE, VERTICAL, HORIZONTAL, QUADRANT }
 enum class ToolMode { BRUSH, REPLACE }
 data class SizeMismatchState(val raw: RawPattern, val currentSize: Int)
+private const val DEBUG_LAYOUT = false
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -658,7 +660,18 @@ class MainActivity : ComponentActivity() {
                         containerColor = UiColors.AppBg,
                         contentColor = UiColors.TextPrimary
                     ) { innerPadding ->
-                        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .padding(innerPadding)
+                                .fillMaxSize()
+                                .then(
+                                    if (DEBUG_LAYOUT) {
+                                        Modifier.background(Color.Green.copy(alpha = 0.12f))
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        ) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             TopAppBar(
                                 title = {},
@@ -800,6 +813,13 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(UiColors.SurfaceBg)
+                                        .then(
+                                            if (DEBUG_LAYOUT) {
+                                                Modifier.background(Color.Red.copy(alpha = 0.12f))
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
                                         .clip(RectangleShape)
                                         .onSizeChanged { layoutSize = it }
                                         .pointerInput(Unit) {
@@ -891,24 +911,34 @@ class MainActivity : ComponentActivity() {
                                     val axisColor = UiColors.Crosshair
                                     Canvas(modifier = Modifier.fillMaxSize()) {
                                         val strokeWidth = 2.dp.toPx()
-                                        val gridActualSize = size.width.coerceAtMost(size.height)
-                                        val gridTopY = (size.height - gridActualSize) / 2f
-                                        val gridBottomY = gridTopY + gridActualSize
-                                        val gridLeftX = (size.width - gridActualSize) / 2f
+                                        val gridBaseSize = size.width.coerceAtMost(size.height)
+                                        val gridActualSize = gridBaseSize * scale
+                                        val gridLeftX = (size.width - gridActualSize) / 2f + offset.x
+                                        val gridTopY = (size.height - gridActualSize) / 2f + offset.y
                                         val gridRightX = gridLeftX + gridActualSize
+                                        val gridBottomY = gridTopY + gridActualSize
+                                        val centerX = (gridLeftX + gridRightX) / 2f
+                                        val centerY = (gridTopY + gridBottomY) / 2f
 
-                                        drawLine(
-                                            color = axisColor,
-                                            start = Offset(x = center.x, y = gridTopY),
-                                            end = Offset(x = center.x, y = gridBottomY),
-                                            strokeWidth = strokeWidth
-                                        )
-                                        drawLine(
-                                            color = axisColor,
-                                            start = Offset(x = gridLeftX, y = center.y),
-                                            end = Offset(x = gridRightX, y = center.y),
-                                            strokeWidth = strokeWidth
-                                        )
+                                        clipRect(
+                                            left = gridLeftX,
+                                            top = gridTopY,
+                                            right = gridRightX,
+                                            bottom = gridBottomY
+                                        ) {
+                                            drawLine(
+                                                color = axisColor,
+                                                start = Offset(x = centerX, y = gridTopY),
+                                                end = Offset(x = centerX, y = gridBottomY),
+                                                strokeWidth = strokeWidth
+                                            )
+                                            drawLine(
+                                                color = axisColor,
+                                                start = Offset(x = gridLeftX, y = centerY),
+                                                end = Offset(x = gridRightX, y = centerY),
+                                                strokeWidth = strokeWidth
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -975,7 +1005,15 @@ class MainActivity : ComponentActivity() {
                         }
 
                         NavigationBar(
-                            modifier = Modifier.align(Alignment.BottomCenter)
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .then(
+                                    if (DEBUG_LAYOUT) {
+                                        Modifier.background(Color.Blue.copy(alpha = 0.12f))
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         ) {
                             NavigationBarItem(
                                 selected = paletteVisible,

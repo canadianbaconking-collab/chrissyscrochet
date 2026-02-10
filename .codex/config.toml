@@ -1,0 +1,6 @@
+# Project-scoped Codex defaults for Chrissy’s Crochet
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[features]
+request_rule = true

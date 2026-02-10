@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.UiColors
@@ -27,7 +28,9 @@ fun PatternGrid(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
-        modifier = modifier,
+        modifier = modifier
+            .aspectRatio(1f)
+            .clipToBounds(),
         userScrollEnabled = false
     ) {
         itemsIndexed(pattern) { index, color ->

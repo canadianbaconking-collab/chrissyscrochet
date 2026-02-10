@@ -1,0 +1,21 @@
+# Allow Gradle wrapper runs (common tokens across OS/shell)
+prefix_rule(
+    pattern = [["./gradlew", ".\\gradlew", "gradlew", "gradlew.bat"]],
+    decision = "allow",
+    justification = "Allow Gradle wrapper commands for building/testing Android project.",
+    match = [
+        "./gradlew :app:assembleDebug",
+        ".\\gradlew test",
+    ],
+)
+
+# OPTIONAL: allow adb (only if you want Codex to install/launch on emulator)
+prefix_rule(
+    pattern = ["adb"],
+    decision = "allow",
+    justification = "Allow adb for emulator install/launch during dev.",
+    match = [
+        "adb devices",
+        "adb install -r app/build/outputs/apk/debug/app-debug.apk",
+    ],
+)
