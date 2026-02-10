@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chrissyscrochet.local/contracts/pattern_transforms.schema.json",
+  "title": "Pattern Transform Contract (Runtime)",
+  "description": "Runtime-only transform metadata for size mismatch loads. Not currently persisted to disk.",
+  "$comment": "This schema documents runtime behavior for load-time transforms and serves as a forward-compatible contract for any future persistence or external tooling. Mirror rules and history semantics are runtime/editor policies documented in SPEC.md and intentionally out of schema scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transform", "sourceSize", "targetSize", "offsetRule"],
+  "properties": {
+    "transform": {
+      "type": "string",
+      "enum": [
+        "identity",
+        "switch_grid_load_raw",
+        "center_pad",
+        "center_crop"
+      ],
+      "description": "Selected mismatch action."
+    },
+    "sourceSize": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Loaded raw pattern size."
+    },
+    "targetSize": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Destination editor size."
+    },
+    "padColor": {
+      "type": "string",
+      "pattern": "^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+      "default": "#FFFFFFFF",
+      "description": "Used only when padding."
+    },
+    "offsetRule": {
+      "type": "string",
+      "const": "floor_half_delta",
+      "description": "Equivalent to (delta / 2) using integer floor."
+    },
+    "persisted": {
+      "type": "boolean",
+      "const": false,
+      "description": "Current app behavior: transform metadata is not saved."
+    }
+  }
+}

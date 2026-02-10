@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chrissyscrochet.local/contracts/custom_palette.schema.json",
+  "title": "Custom Palette Persistence Contract",
+  "description": "Contract for persisted custom palette colors and normalization rules.",
+  "$comment": "Current codebase does not persist custom palette colors to disk/SharedPreferences. This contract is a documented future target for clean-room implementation and external tools. Palette size is intentionally uncapped in v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "implementedInCurrentCode",
+    "storage",
+    "normalization",
+    "listFormat",
+    "capacity"
+  ],
+  "properties": {
+    "implementedInCurrentCode": {
+      "type": "boolean",
+      "const": false,
+      "description": "False indicates persistence is not currently implemented."
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "sharedPreferencesName", "keys"],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "const": "SharedPreferences (future)"
+        },
+        "sharedPreferencesName": {
+          "type": "string",
+          "const": "palette_custom_colors"
+        },
+        "keys": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["custom_palette_colors"],
+          "properties": {
+            "custom_palette_colors": {
+              "type": "string",
+              "description": "Single key storing canonical list payload."
+            }
+          }
+        }
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acceptedInput", "canonicalOutput"],
+      "properties": {
+        "acceptedInput": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["#RRGGBB", "#AARRGGBB"] },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "canonicalOutput": {
+          "type": "string",
+          "const": "#AARRGGBB",
+          "description": "Runtime should normalize #RRGGBB to #FFRRGGBB before persistence."
+        }
+      }
+    },
+    "listFormat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encoding", "delimiter", "itemPattern", "orderSemantics"],
+      "properties": {
+        "encoding": {
+          "type": "string",
+          "const": "comma_separated_string"
+        },
+        "delimiter": {
+          "type": "string",
+          "const": ","
+        },
+        "itemPattern": {
+          "type": "string",
+          "const": "^#[0-9A-Fa-f]{8}$"
+        },
+        "orderSemantics": {
+          "type": "string",
+          "const": "append_order_preserved"
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxColors"],
+      "properties": {
+        "maxColors": {
+          "type": "null",
+          "description": "No hard cap in v1."
+        }
+      }
+    }
+  }
+}

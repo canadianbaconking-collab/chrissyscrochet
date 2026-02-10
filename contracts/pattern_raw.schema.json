@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chrissyscrochet.local/contracts/pattern_raw.schema.json",
+  "title": "Pattern Raw Storage Object",
+  "description": "Canonical in-memory/raw object form of a saved pattern. On disk today, patterns are persisted as comma-separated hex text; this schema models the equivalent structured form. Runtime MUST validate that colors.length == size*size before accepting as a valid pattern.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["size", "colors"],
+  "properties": {
+    "size": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Square grid side length."
+    },
+    "colors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+        "description": "Hex color token. RRGGBB implies opaque; AARRGGBB includes alpha."
+      },
+      "description": "Row-major flattened cell colors."
+    }
+  },
+  "$comment": "Prominent invariant: runtime validation is required; colors.length MUST equal size*size, otherwise load must fail."
+}

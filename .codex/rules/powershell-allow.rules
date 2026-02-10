@@ -1,0 +1,19 @@
+# Allow running our audited helper script to print file line ranges
+prefix_rule(
+  pattern = [["pwsh", "powershell"]],
+  decision = "allow",
+  justification = "Allow safe local helper scripts (show-lines) used to inspect files for debugging.",
+  match = [
+    "pwsh -File .\\tools\\show-lines.ps1 -Path app/src/main/java/com/example/myapplication/MainActivity.kt -Start 740 -End 980",
+  ],
+)
+
+# Also allow calling the script directly if Codex omits pwsh in a PowerShell shell
+prefix_rule(
+  pattern = [".\\tools\\show-lines.ps1"],
+  decision = "allow",
+  justification = "Allow direct invocation of show-lines helper in PowerShell sessions.",
+  match = [
+    ".\\tools\\show-lines.ps1 -Path app/src/main/java/com/example/myapplication/MainActivity.kt -Start 740 -End 980",
+  ],
+)
