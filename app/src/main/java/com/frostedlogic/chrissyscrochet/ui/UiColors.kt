@@ -1,4 +1,4 @@
-package com.example.myapplication.ui
+package com.frostedlogic.chrissyscrochet.ui
 
 import androidx.compose.ui.graphics.Color
 
@@ -11,3 +11,4 @@ object UiColors {
     val Crosshair = Color(0xFFBEE1FF)
     val TextPrimary = Color(0xFFE6EDF3)
 }
+

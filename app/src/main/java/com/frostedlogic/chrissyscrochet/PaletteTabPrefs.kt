@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import android.content.SharedPreferences
 
@@ -44,3 +44,4 @@ fun savePaletteTabNames(sharedPreferences: SharedPreferences, names: List<String
     editor.apply()
     return saved
 }
+

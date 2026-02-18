@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -33,3 +33,4 @@ class PaletteTabPrefsTest {
         assertNull(sanitizePaletteTabName("   "))
     }
 }
+

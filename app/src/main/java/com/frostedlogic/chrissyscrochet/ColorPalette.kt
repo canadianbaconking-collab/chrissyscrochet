@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -223,3 +223,4 @@ fun hexToColor(hex: String): Color {
     val value = argb.toLong(16)
     return Color(value)
 }
+

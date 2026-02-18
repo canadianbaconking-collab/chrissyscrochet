@@ -1,40 +1,18 @@
 import java.util.Properties
-import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-if (keystorePropertiesFile.exists()) {
-    val keystoreProperties = Properties()
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-    android {
-        signingConfigs {
-            create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-            }
-        }
-        buildTypes {
-            release {
-                signingConfig = signingConfigs.getByName("release")
-            }
-        }
-    }
-}
-
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.frostedlogic.chrissyscrochet"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.example.myapplication.clean.canvas"
+        applicationId = "com.frostedlogic.chrissyscrochet"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
@@ -43,19 +21,40 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing reads from local.properties (NOT committed)
+    val localProps = Properties().apply {
+        val f = rootProject.file("local.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+
+    signingConfigs {
+        create("release") {
+            val storeFilePath = localProps.getProperty("RELEASE_STORE_FILE")
+            if (!storeFilePath.isNullOrBlank()) {
+                storeFile = file(storeFilePath)
+                storePassword = localProps.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = localProps.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = localProps.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
@@ -74,11 +73,13 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     // This dependency is required for the icons used in the app.
     implementation("androidx.compose.material:material-icons-extended")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

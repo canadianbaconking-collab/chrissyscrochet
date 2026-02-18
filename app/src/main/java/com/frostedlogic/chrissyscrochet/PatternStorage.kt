@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import android.content.ContentValues
 import android.content.Context
@@ -261,3 +261,4 @@ fun exportPatternToJpg(context: Context, filename: String, pattern: List<Color>,
         false
     }
 }
+

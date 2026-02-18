@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import android.content.Context.MODE_PRIVATE
 import android.graphics.Bitmap
@@ -99,8 +99,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.example.myapplication.ui.UiColors
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.frostedlogic.chrissyscrochet.ui.UiColors
+import com.frostedlogic.chrissyscrochet.ui.theme.MyApplicationTheme
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1301,3 +1301,4 @@ private fun loadBitmapSafely(path: String): Bitmap? {
         null
     }
 }
+

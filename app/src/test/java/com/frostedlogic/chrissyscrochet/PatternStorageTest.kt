@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
@@ -53,3 +53,4 @@ class PatternStorageTest {
         assertEquals(src[3 * 5 + 3], out[8])
     }
 }
+

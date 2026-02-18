@@ -24,3 +24,21 @@ Thumbs.db
 *.apk
 *.aab
 
+# Add ignores for Android Studio / IntelliJ + build artifacts
+@"
+# IDE
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+**/build/
+
+# Local configs
+local.properties
+
+# Logs
+*.log
+"@ | Add-Content ".gitignore"
+
+git status -sb

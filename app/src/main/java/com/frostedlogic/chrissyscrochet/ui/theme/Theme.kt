@@ -1,9 +1,9 @@
-package com.example.myapplication.ui.theme
+package com.frostedlogic.chrissyscrochet.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import com.example.myapplication.ui.UiColors
+import com.frostedlogic.chrissyscrochet.ui.UiColors
 
 private val AppDarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -28,3 +28,4 @@ fun MyApplicationTheme(content: @Composable () -> Unit) {
         content = content
     )
 }
+

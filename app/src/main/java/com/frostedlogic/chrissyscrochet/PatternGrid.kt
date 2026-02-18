@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.frostedlogic.chrissyscrochet
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
@@ -8,7 +8,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.ui.UiColors
+import com.frostedlogic.chrissyscrochet.ui.UiColors
 
 @Composable
 fun PatternGrid(
@@ -107,3 +107,4 @@ fun PatternGrid(
         }
     }
 }
+
